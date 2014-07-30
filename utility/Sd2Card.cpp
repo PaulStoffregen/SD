@@ -19,8 +19,200 @@
  */
 #include <Arduino.h>
 #include "Sd2Card.h"
+
+
+
+
+
+#if defined(__MK20DX128__) || defined(__MK20DX256__)
+#define USE_TEENSY3_SPI
+
+
+// Teensy 3.0 functions  (copied from sdfatlib20130629)
+#include <mk20dx128.h>
+// Limit initial fifo to three entries to avoid fifo overrun
+#define SPI_INITIAL_FIFO_DEPTH 3
+// define some symbols that are not in mk20dx128.h
+#ifndef SPI_SR_RXCTR
+#define SPI_SR_RXCTR 0XF0
+#endif  // SPI_SR_RXCTR
+#ifndef SPI_PUSHR_CONT
+#define SPI_PUSHR_CONT 0X80000000
+#endif   // SPI_PUSHR_CONT
+#ifndef SPI_PUSHR_CTAS
+#define SPI_PUSHR_CTAS(n) (((n) & 7) << 28)
+#endif  // SPI_PUSHR_CTAS
+
+static void spiBegin() {
+  SIM_SCGC6 |= SIM_SCGC6_SPI0;
+}
+
+static void spiInit(uint8_t spiRate) {
+  // spiRate = 0 : 24 or 12 Mbit/sec
+  // spiRate = 1 : 12 or 6 Mbit/sec
+  // spiRate = 2 : 6 or 3 Mbit/sec
+  // spiRate = 3 : 4 or 2.0 Mbit/sec
+  // spiRate = 4 : 3 or 1.5 Mbit/sec
+  // spiRate = 5 : 250 kbit/sec
+  // spiRate = 6 : 125 kbit/sec
+  uint32_t ctar, ctar0, ctar1;
+  switch (spiRate/2) {
+    // 1/2 speed
+    case 0: ctar = SPI_CTAR_DBR | SPI_CTAR_BR(0) | SPI_CTAR_CSSCK(0); break;
+    // 1/4 speed
+    case 1: ctar = SPI_CTAR_BR(0) | SPI_CTAR_CSSCK(0); break;
+    // 1/8 speed
+    case 2: ctar = SPI_CTAR_BR(1) | SPI_CTAR_CSSCK(1); break;
+    // 1/12 speed
+    case 3: ctar = SPI_CTAR_BR(2) | SPI_CTAR_CSSCK(2); break;
+    // 1/16 speed
+    case 4: ctar = SPI_CTAR_BR(3) | SPI_CTAR_CSSCK(3); break;
+#if F_BUS == 48000000
+    case 5: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(5) | SPI_CTAR_CSSCK(5); break;
+    default: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(6) | SPI_CTAR_CSSCK(6);
+#elif F_BUS == 24000000
+    case 5: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(4) | SPI_CTAR_CSSCK(4); break;
+    default: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(5) | SPI_CTAR_CSSCK(5);
+#else
+#error "MK20DX128 bus frequency must be 48 or 24 MHz"
+#endif
+  }
+
+  // CTAR0 - 8 bit transfer
+  ctar0 = ctar | SPI_CTAR_FMSZ(7);
+  // CTAR1 - 16 bit transfer
+  ctar1 = ctar | SPI_CTAR_FMSZ(15);
+
+  if (SPI0_CTAR0 != ctar0 || SPI0_CTAR1 != ctar1) {
+    SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_MDIS | SPI_MCR_HALT | SPI_MCR_PCSIS(0x1F);
+    SPI0_CTAR0 = ctar0;
+    SPI0_CTAR1 = ctar1;
+  }
+  SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_PCSIS(0x1F);
+  SPCR.enable_pins();
+}
+
+/** SPI receive a byte */
+static  uint8_t spiRec() {
+  SPI0_MCR |= SPI_MCR_CLR_RXF;
+  SPI0_SR = SPI_SR_TCF;
+  SPI0_PUSHR = 0xFF;
+  while (!(SPI0_SR & SPI_SR_TCF)) {}
+  return SPI0_POPR;
+}
+/** SPI receive multiple bytes */
+static uint8_t spiRec(uint8_t* buf, size_t len) {
+  // clear any data in RX FIFO
+  SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_CLR_RXF | SPI_MCR_PCSIS(0x1F);
+  // use 16 bit frame to avoid TD delay between frames
+  // get one byte if len is odd
+  if (len & 1) {
+    *buf++ = spiRec();
+    len--;
+  }
+  // initial number of words to push into TX FIFO
+  int nf = len/2 < SPI_INITIAL_FIFO_DEPTH ? len/2 : SPI_INITIAL_FIFO_DEPTH;
+  for (int i = 0; i < nf; i++) {
+    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | 0XFFFF;
+  }
+  uint8_t* limit = buf + len - 2*nf;
+  while (buf < limit) {
+    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
+    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | 0XFFFF;
+    uint16_t w = SPI0_POPR;
+    *buf++ = w >> 8;
+    *buf++ = w & 0XFF;
+  }
+  // limit for rest of RX data
+  limit += 2*nf;
+  while (buf < limit) {
+    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
+    uint16_t w = SPI0_POPR;
+    *buf++ = w >> 8;
+    *buf++ = w & 0XFF;
+  }
+  return 0;
+}
+static void spiRecIgnore(size_t len) {
+  // clear any data in RX FIFO
+  SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_CLR_RXF | SPI_MCR_PCSIS(0x1F);
+  // use 16 bit frame to avoid TD delay between frames
+  // get one byte if len is odd
+  if (len & 1) {
+    spiRec();
+    len--;
+  }
+  // initial number of words to push into TX FIFO
+  int nf = len/2 < SPI_INITIAL_FIFO_DEPTH ? len/2 : SPI_INITIAL_FIFO_DEPTH;
+  for (int i = 0; i < nf; i++) {
+    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | 0XFFFF;
+    len -= 2;
+  }
+  //uint8_t* limit = buf + len - 2*nf;
+  //while (buf < limit) {
+  while (len > 0) {
+    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
+    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | 0XFFFF;
+    SPI0_POPR;
+    len -= 2;
+  }
+  // limit for rest of RX data
+  while (nf > 0) {
+    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
+    SPI0_POPR;
+    nf--;
+  }
+}
+/** SPI send a byte */
+static void spiSend(uint8_t b) {
+  SPI0_MCR |= SPI_MCR_CLR_RXF;
+  SPI0_SR = SPI_SR_TCF;
+  SPI0_PUSHR = b;
+  while (!(SPI0_SR & SPI_SR_TCF)) {}
+}
+/** SPI send multiple bytes */
+static void spiSend(const uint8_t* output, size_t len) {
+  // clear any data in RX FIFO
+  SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_CLR_RXF | SPI_MCR_PCSIS(0x1F);
+  // use 16 bit frame to avoid TD delay between frames
+  // send one byte if len is odd
+  if (len & 1) {
+    spiSend(*output++);
+    len--;
+  }
+  // initial number of words to push into TX FIFO
+  int nf = len/2 < SPI_INITIAL_FIFO_DEPTH ? len/2 : SPI_INITIAL_FIFO_DEPTH;
+  // limit for pushing data into TX fifo
+  const uint8_t* limit = output + len;
+  for (int i = 0; i < nf; i++) {
+    uint16_t w = (*output++) << 8;
+    w |= *output++;
+    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | w;
+  }
+  // write data to TX FIFO
+  while (output < limit) {
+    uint16_t w = *output++ << 8;
+    w |= *output++;
+    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
+    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | w;
+    SPI0_POPR;
+  }
+  // wait for data to be sent
+  while (nf) {
+    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
+    SPI0_POPR;
+    nf--;
+  }
+}
+
+
+
+
+
+
+
 //------------------------------------------------------------------------------
-#ifndef SOFTWARE_SPI
+#elif !defined(SOFTWARE_SPI)
 // functions for hardware SPI
 /** Send a byte to the card */
 static void spiSend(uint8_t b) {
@@ -32,6 +224,11 @@ static  uint8_t spiRec(void) {
   spiSend(0XFF);
   return SPDR;
 }
+
+
+
+
+
 #else  // SOFTWARE_SPI
 //------------------------------------------------------------------------------
 /** nop to tune soft SPI timing */
@@ -87,6 +284,14 @@ void spiSend(uint8_t data) {
   sei();
 }
 #endif  // SOFTWARE_SPI
+
+
+
+
+
+
+
+
 //------------------------------------------------------------------------------
 // send command and return error code.  Return zero for OK
 uint8_t Sd2Card::cardCommand(uint8_t cmd, uint32_t arg) {
@@ -217,13 +422,19 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
   uint16_t t0 = (uint16_t)millis();
   uint32_t arg;
 
+  pinMode(chipSelectPin_, OUTPUT);
+  digitalWrite(chipSelectPin_, HIGH);
+
+#ifdef USE_TEENSY3_SPI
+  spiBegin();
+  spiInit(6);
+#else
   // set pin modes
   pinMode(chipSelectPin_, OUTPUT);
   chipSelectHigh();
   pinMode(SPI_MISO_PIN, INPUT);
   pinMode(SPI_MOSI_PIN, OUTPUT);
   pinMode(SPI_SCK_PIN, OUTPUT);
-
 #ifndef SOFTWARE_SPI
   // SS must be in output mode even it is not chip select
   pinMode(SS_PIN, OUTPUT);
@@ -233,6 +444,7 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
   // clear double speed
   SPSR &= ~(1 << SPI2X);
 #endif  // SOFTWARE_SPI
+#endif  // not USE_TEENSY3_SPI
 
   // must supply min of 74 clock cycles with CS high.
   for (uint8_t i = 0; i < 10; i++) spiSend(0XFF);
@@ -354,7 +566,16 @@ uint8_t Sd2Card::readData(uint32_t block,
     inBlock_ = 1;
   }
 
-#ifdef OPTIMIZE_HARDWARE_SPI
+#if defined(USE_TEENSY3_SPI)
+
+  // skip data before offset
+  //for (;offset_ < offset; offset_++) {
+    //spiRec();
+  //}
+  spiRecIgnore(offset);
+  spiRec(dst, count);
+
+#elif defined(OPTIMIZE_HARDWARE_SPI)
   // start first spi transfer
   SPDR = 0XFF;
 
@@ -402,7 +623,12 @@ uint8_t Sd2Card::readData(uint32_t block,
 void Sd2Card::readEnd(void) {
   if (inBlock_) {
       // skip data and crc
-#ifdef OPTIMIZE_HARDWARE_SPI
+#if defined(USE_TEENSY3_SPI)
+    if (offset_ < 514) {
+      spiRecIgnore(514 - offset_);
+      offset_ = 514;
+    }
+#elif defined(OPTIMIZE_HARDWARE_SPI)
     // optimize skip for hardware
     SPDR = 0XFF;
     while (offset_++ < 513) {
@@ -444,6 +670,14 @@ uint8_t Sd2Card::readRegister(uint8_t cmd, void* buf) {
  *
  * \param[in] sckRateID A value in the range [0, 6].
  *
+ * 0 = 8 MHz
+ * 1 = 4 MHz
+ * 2 = 2 MHz
+ * 3 = 1 MHz
+ * 4 = 500 kHz
+ * 5 = 125 kHz
+ * 6 = 63 kHz
+ *
  * The SPI clock will be set to F_CPU/pow(2, 1 + sckRateID). The maximum
  * SPI rate is F_CPU/2 for \a sckRateID = 0 and the minimum rate is F_CPU/128
  * for \a scsRateID = 6.
@@ -452,6 +686,10 @@ uint8_t Sd2Card::readRegister(uint8_t cmd, void* buf) {
  * false, is returned for an invalid value of \a sckRateID.
  */
 uint8_t Sd2Card::setSckRate(uint8_t sckRateID) {
+#ifdef USE_TEENSY3_SPI
+  spiInit(sckRateID);
+  return true;
+#else
   if (sckRateID > 6) {
     error(SD_CARD_ERROR_SCK_RATE);
     return false;
@@ -466,6 +704,7 @@ uint8_t Sd2Card::setSckRate(uint8_t sckRateID) {
   SPCR |= (sckRateID & 4 ? (1 << SPR1) : 0)
     | (sckRateID & 2 ? (1 << SPR0) : 0);
   return true;
+#endif
 }
 //------------------------------------------------------------------------------
 // wait for card to go not busy

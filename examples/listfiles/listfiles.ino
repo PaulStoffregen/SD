@@ -21,6 +21,14 @@
 
 File root;
 
+// change this to match your SD shield or module;
+// Arduino Ethernet shield: pin 4
+// Adafruit SD shields and modules: pin 10
+// Sparkfun SD shield: pin 8
+// Teensy 2.0: pin 0
+// Teensy++ 2.0: pin 20
+const int chipSelect = 10;
+
 void setup()
 {
   // Open serial communications and wait for port to open:
@@ -37,7 +45,7 @@ void setup()
   // or the SD library functions will not work. 
   pinMode(10, OUTPUT);
 
-  if (!SD.begin(10)) {
+  if (!SD.begin(chipSelect)) {
     Serial.println("initialization failed!");
     return;
   }
