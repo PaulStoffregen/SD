@@ -21,11 +21,14 @@
 #include <SPI.h>
 #include "Sd2Card.h"
 
+#ifdef SPI_HAS_TRANSACTION
+static SPISettings settings;
+#endif
+
 
 
 #if defined(__MK20DX128__) || defined(__MK20DX256__)
 #define USE_TEENSY3_SPI
-
 
 // Teensy 3.0 functions  (copied from sdfatlib20130629)
 #include <mk20dx128.h>
@@ -47,48 +50,16 @@ static void spiBegin() {
 }
 
 static void spiInit(uint8_t spiRate) {
-  // spiRate = 0 : 24 or 12 Mbit/sec
-  // spiRate = 1 : 12 or 6 Mbit/sec
-  // spiRate = 2 : 6 or 3 Mbit/sec
-  // spiRate = 3 : 4 or 2.0 Mbit/sec
-  // spiRate = 4 : 3 or 1.5 Mbit/sec
-  // spiRate = 5 : 250 kbit/sec
-  // spiRate = 6 : 125 kbit/sec
-  uint32_t ctar, ctar0, ctar1;
-  switch (spiRate/2) {
-    // 1/2 speed
-    case 0: ctar = SPI_CTAR_DBR | SPI_CTAR_BR(0) | SPI_CTAR_CSSCK(0); break;
-    // 1/4 speed
-    case 1: ctar = SPI_CTAR_BR(0) | SPI_CTAR_CSSCK(0); break;
-    // 1/8 speed
-    case 2: ctar = SPI_CTAR_BR(1) | SPI_CTAR_CSSCK(1); break;
-    // 1/12 speed
-    case 3: ctar = SPI_CTAR_BR(2) | SPI_CTAR_CSSCK(2); break;
-    // 1/16 speed
-    case 4: ctar = SPI_CTAR_BR(3) | SPI_CTAR_CSSCK(3); break;
-#if F_BUS == 48000000
-    case 5: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(5) | SPI_CTAR_CSSCK(5); break;
-    default: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(6) | SPI_CTAR_CSSCK(6);
-#elif F_BUS == 24000000
-    case 5: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(4) | SPI_CTAR_CSSCK(4); break;
-    default: ctar = SPI_CTAR_PBR(1) | SPI_CTAR_BR(5) | SPI_CTAR_CSSCK(5);
-#else
-#error "MK20DX128 bus frequency must be 48 or 24 MHz"
-#endif
+  switch (spiRate) {
+    case 0:  settings = SPISettings(12000000, MSBFIRST, SPI_MODE0); break;
+    case 1:  settings = SPISettings(8000000, MSBFIRST, SPI_MODE0); break;
+    case 2:  settings = SPISettings(6000000, MSBFIRST, SPI_MODE0); break;
+    case 3:  settings = SPISettings(4000000, MSBFIRST, SPI_MODE0); break;
+    case 4:  settings = SPISettings(3000000, MSBFIRST, SPI_MODE0); break;
+    case 5:  settings = SPISettings(2000000, MSBFIRST, SPI_MODE0); break;
+    default: settings = SPISettings(400000, MSBFIRST, SPI_MODE0);
   }
-
-  // CTAR0 - 8 bit transfer
-  ctar0 = ctar | SPI_CTAR_FMSZ(7);
-  // CTAR1 - 16 bit transfer
-  ctar1 = ctar | SPI_CTAR_FMSZ(15);
-
-  if (SPI0_CTAR0 != ctar0 || SPI0_CTAR1 != ctar1) {
-    SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_MDIS | SPI_MCR_HALT | SPI_MCR_PCSIS(0x1F);
-    SPI0_CTAR0 = ctar0;
-    SPI0_CTAR1 = ctar1;
-  }
-  SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_PCSIS(0x1F);
-  SPCR.enable_pins();
+  SPI.begin();
 }
 
 /** SPI receive a byte */
@@ -289,9 +260,15 @@ uint32_t Sd2Card::cardSize(void) {
 //------------------------------------------------------------------------------
 void Sd2Card::chipSelectHigh(void) {
   digitalWrite(chipSelectPin_, HIGH);
+#ifdef SPI_HAS_TRANSACTION
+  SPI.endTransaction();
+#endif
 }
 //------------------------------------------------------------------------------
 void Sd2Card::chipSelectLow(void) {
+#ifdef SPI_HAS_TRANSACTION
+  SPI.beginTransaction(settings);
+#endif
   digitalWrite(chipSelectPin_, LOW);
 }
 //------------------------------------------------------------------------------
@@ -382,10 +359,19 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
   SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR1) | (1 << SPR0);
   // clear double speed
   SPSR &= ~(1 << SPI2X);
+#ifdef SPI_HAS_TRANSACTION
+  settings = SPISettings(250000, MSBFIRST, SPI_MODE0);
+#endif
 #endif  // not USE_TEENSY3_SPI
 
   // must supply min of 74 clock cycles with CS high.
+#ifdef SPI_HAS_TRANSACTION
+  SPI.beginTransaction(settings);
+#endif
   for (uint8_t i = 0; i < 10; i++) spiSend(0XFF);
+#ifdef SPI_HAS_TRANSACTION
+  SPI.endTransaction();
+#endif
 
   chipSelectLow();
 
@@ -624,10 +610,7 @@ uint8_t Sd2Card::setSckRate(uint8_t sckRateID) {
   spiInit(sckRateID);
   return true;
 #else
-  if (sckRateID > 6) {
-    error(SD_CARD_ERROR_SCK_RATE);
-    return false;
-  }
+  if (sckRateID > 6) sckRateID = 6;
   // see avr processor datasheet for SPI register bit definitions
   if ((sckRateID & 1) || sckRateID == 6) {
     SPSR &= ~(1 << SPI2X);
@@ -637,6 +620,17 @@ uint8_t Sd2Card::setSckRate(uint8_t sckRateID) {
   SPCR &= ~((1 <<SPR1) | (1 << SPR0));
   SPCR |= (sckRateID & 4 ? (1 << SPR1) : 0)
     | (sckRateID & 2 ? (1 << SPR0) : 0);
+#ifdef SPI_HAS_TRANSACTION
+  switch (sckRateID) {
+    case 0:  settings = SPISettings(8000000, MSBFIRST, SPI_MODE0); break;
+    case 1:  settings = SPISettings(4000000, MSBFIRST, SPI_MODE0); break;
+    case 2:  settings = SPISettings(2000000, MSBFIRST, SPI_MODE0); break;
+    case 3:  settings = SPISettings(1000000, MSBFIRST, SPI_MODE0); break;
+    case 4:  settings = SPISettings(500000, MSBFIRST, SPI_MODE0); break;
+    case 5:  settings = SPISettings(250000, MSBFIRST, SPI_MODE0); break;
+    default: settings = SPISettings(125000, MSBFIRST, SPI_MODE0);
+  }
+#endif
   return true;
 #endif
 }

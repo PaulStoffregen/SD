@@ -21,6 +21,7 @@
  */
  // include the SD library:
 #include <SD.h>
+#include <SPI.h>
 
 // set up variables using the SD utility library functions:
 Sd2Card card;

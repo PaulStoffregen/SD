@@ -21,6 +21,7 @@
  */
 
 #include <SD.h>
+#include <SPI.h>
 
 // On the Ethernet Shield, CS is pin 4. Note that even if it's not
 // used as the CS pin, the hardware CS pin (10 on most Arduino boards,
