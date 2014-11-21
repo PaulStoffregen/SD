@@ -259,16 +259,25 @@ uint32_t Sd2Card::cardSize(void) {
   }
 }
 //------------------------------------------------------------------------------
+#ifdef SPI_HAS_TRANSACTION
+static uint8_t chip_select_asserted = 0;
+#endif
 void Sd2Card::chipSelectHigh(void) {
   digitalWrite(chipSelectPin_, HIGH);
 #ifdef SPI_HAS_TRANSACTION
-  SPI.endTransaction();
+  if (chip_select_asserted) {
+    chip_select_asserted = 0;
+    SPI.endTransaction();
+  }
 #endif
 }
 //------------------------------------------------------------------------------
 void Sd2Card::chipSelectLow(void) {
 #ifdef SPI_HAS_TRANSACTION
-  SPI.beginTransaction(settings);
+  if (!chip_select_asserted) {
+    chip_select_asserted = 1;
+    SPI.beginTransaction(settings);
+  }
 #endif
   digitalWrite(chipSelectPin_, LOW);
 }
@@ -340,6 +349,7 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
   uint16_t t0 = (uint16_t)millis();
   uint32_t arg;
 
+  digitalWrite(chipSelectPin_, HIGH);
   pinMode(chipSelectPin_, OUTPUT);
   digitalWrite(chipSelectPin_, HIGH);
 
@@ -348,8 +358,6 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
   spiInit(6);
 #else
   // set pin modes
-  pinMode(chipSelectPin_, OUTPUT);
-  chipSelectHigh();
   pinMode(SPI_MISO_PIN, INPUT);
   pinMode(SPI_MOSI_PIN, OUTPUT);
   pinMode(SPI_SCK_PIN, OUTPUT);
