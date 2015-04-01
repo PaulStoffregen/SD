@@ -142,6 +142,7 @@ static void spiSend(uint8_t b) {
   while (!(SPI0_SR & SPI_SR_TCF)) {}
 }
 /** SPI send multiple bytes */
+#if 0
 static void spiSend(const uint8_t* output, size_t len) {
   // clear any data in RX FIFO
   SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_CLR_RXF | SPI_MCR_PCSIS(0x1F);
@@ -175,7 +176,7 @@ static void spiSend(const uint8_t* output, size_t len) {
     nf--;
   }
 }
-
+#endif
 
 
 
@@ -475,7 +476,7 @@ uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst) {
  */
 uint8_t Sd2Card::readData(uint32_t block,
         uint16_t offset, uint16_t count, uint8_t* dst) {
-  uint16_t n;
+  //uint16_t n;
   if (count == 0) return true;
   if ((count + offset) > 512) {
     goto fail;
