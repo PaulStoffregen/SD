@@ -476,7 +476,9 @@ uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst) {
  */
 uint8_t Sd2Card::readData(uint32_t block,
         uint16_t offset, uint16_t count, uint8_t* dst) {
-  //uint16_t n;
+#if !defined(USE_TEENSY3_SPI) && defined(OPTIMIZE_HARDWARE_SPI)
+  uint16_t n;
+#endif
   if (count == 0) return true;
   if ((count + offset) > 512) {
     goto fail;
