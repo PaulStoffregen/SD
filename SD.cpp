@@ -51,6 +51,7 @@
  */
 
 #include "SD.h"
+#ifndef __SD_t3_H__
 
 // Used by `getNextPathComponent`
 #define MAX_COMPONENT_LEN 12 // What is max length?
@@ -614,3 +615,4 @@ void File::rewindDirectory(void) {
 }
 
 SDClass SD;
+#endif

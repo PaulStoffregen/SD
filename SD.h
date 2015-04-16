@@ -1,3 +1,6 @@
+#if defined(__arm__)
+#include "SD_t3.h"
+#endif
 /*
 
  SD - a slightly more friendly wrapper for sdfatlib

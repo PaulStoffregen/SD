@@ -13,6 +13,7 @@
  */
 
 #include <SD.h>
+#ifndef __SD_t3_H__
 
 /* for debugging file open/close leaks
    uint8_t nfilecount=0;
@@ -147,4 +148,4 @@ File::operator bool() {
     return  _file->isOpen();
   return false;
 }
-
+#endif
