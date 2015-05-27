@@ -36,8 +36,12 @@ File SDClass::open(const char *path, uint8_t mode)
 	File root = rootDir;
 	File f;
 
-	if (mode > FILE_READ) return f;
+	if (mode > FILE_READ) return f; // TODO: writing not yet supported
 
+	if (strcmp(path, "/") == 0) {
+		f = rootDir;
+		return f;
+	}
 	// TODO: this needs the path traversal feature
 
 	//Serial.println("SDClass::open");
@@ -49,12 +53,82 @@ File SDClass::open(const char *path, uint8_t mode)
 	return f;
 }
 
+bool SDClass::exists(const char *path)
+{
+	File f = open(path);
+	return (bool)f;
+}
+
 File File::openNextFile(uint8_t mode)
 {
 	File f;
+	uint32_t lba, sector_offset, sector_index, sector_count;
 
-	if (mode > FILE_READ) return f;
-
+	//Serial.print("File::openNextFile, offset=");
+	//Serial.println(offset);
+	if (mode > FILE_READ) return f; // TODO: writing not yet supported
+	if (type == FILE_DIR_ROOT16) {
+		//Serial.print("  fat16 dir");
+		sector_offset = offset >> 9;
+		lba = start_cluster + sector_offset;
+		sector_count = length  >> 9;
+	} else if (type == FILE_DIR) {
+		//Serial.print("  subdir");
+		sector_offset = cluster_offset(offset) >> 9;
+		lba = custer_to_sector(current_cluster) + sector_offset;
+		sector_count = (1 << SDClass::sector2cluster);
+	} else {
+		return f;
+	}
+	//Serial.print("  sector_offset=");
+	//Serial.println(sector_offset);
+	//Serial.print("  lba=");
+	//Serial.println(lba);
+	//Serial.print("  sector_count=");
+	//Serial.println(sector_count);
+	sector_index = (offset >> 5) & 15;
+	//Serial.print("  sector_index=");
+	//Serial.println(sector_index);
+	while (1) {
+		SDCache sector;
+		sector_t *s = sector.read(lba);
+		if (!s) return f;
+		fatdir_t *dirent = s->dir + sector_index;
+		while (sector_index < 16) {
+			//Serial.print("    sector_index=");
+			//Serial.println(sector_index);
+			if (dirent->attrib != ATTR_LONG_NAME) {
+				uint8_t b0 = dirent->name[0];
+				//Serial.print("    b0=");
+				//Serial.println(b0);
+				if (b0 == 0) return f;
+				if (b0 != 0xE5 && memcmp(dirent->name, ".          ", 11) != 0
+				    && memcmp(dirent->name, "..         ", 11) != 0) {
+					f.init(dirent);
+					sector.release();
+					offset += 32;
+					if (cluster_offset(offset) == 0) {
+						 next_cluster(); // TODO: handle error
+					}
+					return f;
+				}
+			}
+			offset += 32;
+			dirent++;
+			sector_index++;
+		}
+		sector.release();
+		sector_index = 0;
+		if (++sector_offset >= sector_count) {
+			if (type == FILE_DIR_ROOT16) {
+				break;
+			} else {
+				if (!next_cluster()) break;
+				lba = custer_to_sector(current_cluster);
+				sector_offset = 0;
+			}
+		}
+	}
 	return f;
 }
 
@@ -141,6 +215,20 @@ void File::init(fatdir_t *dirent)
 	start_cluster = (dirent->cluster_high << 16) | dirent->cluster_low;
 	current_cluster = start_cluster;
 	type = (dirent->attrib & ATTR_DIRECTORY) ? FILE_DIR : FILE_READ;
+	char *p = namestr;
+	const char *s = dirent->name;
+	for (int i=0; i < 8; i++) {
+		if (*s == ' ') break;
+		*p++ = *s++;
+	}
+	s = dirent->name + 8;
+	if (*s != ' ') {
+		*p++ = '.';
+		*p++ = *s++;
+		if (*s != ' ') *p++ = *s++;
+		if (*s != ' ') *p++ = *s++;
+	}
+	*p = 0;
 	//Serial.printf("File::init, cluster = %d, length = %d\n", start_cluster, length);
 }
 

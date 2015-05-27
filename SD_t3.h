@@ -27,7 +27,7 @@
 // This Teensy 3.x optimized version is a work-in-progress.
 // Uncomment this line to use the Teensy version.  Otherwise,
 // the normal SD library is used.
-//#define USE_TEENSY3_OPTIMIZED_CODE
+#define USE_TEENSY3_OPTIMIZED_CODE
 
 /* Why reinvent the SD library wheel...
  *   1: Allow reading files from within interrupts
@@ -158,7 +158,9 @@ public:
 	operator bool() {
 		return (type < FILE_INVALID);
 	}
-	char * name();
+	char * name() {
+		return namestr;
+	}
 	bool isDirectory() {
 		return (type == FILE_DIR) || (type == FILE_DIR_ROOT16);
 	}
@@ -182,7 +184,7 @@ private:
 	uint32_t dirent_lba;      // dir sector for this file
 	uint8_t  dirent_index;    // dir index within sector (0 to 15)
 	uint8_t type;             // file vs dir
-	char namestr[12];
+	char namestr[13];
 	friend class SDClass;
 	static inline uint32_t cluster_number(uint32_t n) {
 		return n >> (SDClass::sector2cluster + 9);

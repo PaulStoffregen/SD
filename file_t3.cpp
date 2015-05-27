@@ -33,6 +33,7 @@
 File::File()
 {
 	type = FILE_INVALID;
+	namestr[0] = 0;
 }
 
 File::~File(void)
