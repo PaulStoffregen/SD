@@ -37,7 +37,9 @@ cache_t SDCache::cache[SD_CACHE_SIZE];
 #define CACHE_FLAG_IS_DIRTY  2
 #define CACHE_FLAG_IS_FAT    4
 
-/*
+//#define PRINT_SECTORS
+
+#ifdef PRINT_SECTORS
 static void print_sector(const void *data)
 {
 	const uint8_t *p = (const uint8_t *)data;
@@ -46,7 +48,7 @@ static void print_sector(const void *data)
 		if ((i & 31) == 31) Serial.println();
 	}
 }
-*/
+#endif
 
 // Read a sector into the cache.  If the sector is already cached,
 // of course no actual read occurs.  This is the primary function
@@ -76,8 +78,10 @@ sector_t * SDCache::read(uint32_t lba, bool is_fat)
 				c->flags = CACHE_FLAG_HAS_DATA;
 				if (is_fat) c->flags |= CACHE_FLAG_IS_FAT;
 				ret = &c->data;
-				 //Serial.printf("cache read %u\n", lba);
-				 //print_sector(&c->data);
+				 #ifdef PRINT_SECTORS
+				 Serial.printf("cache read %u\n", lba);
+				 print_sector(&c->data);
+				 #endif
 			}
 		}
 	}

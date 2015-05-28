@@ -164,7 +164,7 @@ bool SDClass::begin(uint8_t csPin)
 	//Serial.printf(" sectors_per_fat = %d\n", sectors_per_fat);
 	uint32_t root_dir_entries = unaligned_read16_align8(vol->u8 + BPB_RootEntCnt);
 	//Serial.printf(" root_dir_entries = %d\n", root_dir_entries);
-	uint32_t root_dir_sectors = (root_dir_entries + 31) >> 5;
+	uint32_t root_dir_sectors = (root_dir_entries + 15) >> 4;
 	//Serial.printf(" root_dir_sectors = %d\n", root_dir_sectors);
 
 	uint32_t total_sectors = unaligned_read16_align8(vol->u8 + BPB_TotSec16);
@@ -173,7 +173,7 @@ bool SDClass::begin(uint8_t csPin)
 
 	fat1_begin_lba = partition_lba + reserved_sectors;
 	fat2_begin_lba = fat1_begin_lba + sectors_per_fat;
-	data_begin_lba = fat2_begin_lba + sectors_per_fat;
+	data_begin_lba = fat2_begin_lba + sectors_per_fat + root_dir_sectors;
 
 	uint32_t cluster_count = (total_sectors - reserved_sectors
 		- root_dir_sectors - (sectors_per_fat << 1)) >> s2c;
@@ -184,7 +184,7 @@ bool SDClass::begin(uint8_t csPin)
 	} else if (cluster_count < 65525) {
 		fat_type = 16;
 		rootDir.length = root_dir_entries << 5;
-		rootDir.start_cluster = partition_lba + reserved_sectors;
+		rootDir.start_cluster = partition_lba + reserved_sectors + sectors_per_fat * 2;
 		rootDir.type = FILE_DIR_ROOT16;
 	} else {
 		fat_type = 32;
