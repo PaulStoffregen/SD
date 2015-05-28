@@ -115,6 +115,7 @@ bool SDClass::begin(uint8_t csPin)
 		if (msec > 1500) return false;
 		SPI.beginTransaction(SD_SPI_SPEED);
 	}
+	//Serial.println("card is ready");
 	// detect high capacity cards
 	if (card_type == 2) {
 		ocr = sd_cmd58();
@@ -134,7 +135,7 @@ bool SDClass::begin(uint8_t csPin)
 	do {
 		uint8_t type = mbr->u8[index+4];
 		//Serial.printf(" partition %d is type %d\n", (index-446)/16+1, type);
-		if (type == 11 || type == 12) {
+		if (type == 6 || type == 11 || type == 12) {
 			partition_lba = unaligned_read32_align16(mbr->u8 + index + 8);
 			//Serial.printf(" partition lba = %d\n", partition_lba);
 			break;

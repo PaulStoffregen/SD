@@ -27,7 +27,7 @@
 // This Teensy 3.x optimized version is a work-in-progress.
 // Uncomment this line to use the Teensy version.  Otherwise,
 // the normal SD library is used.
-//#define USE_TEENSY3_OPTIMIZED_CODE
+#define USE_TEENSY3_OPTIMIZED_CODE
 
 /* Why reinvent the SD library wheel...
  *   1: Allow reading files from within interrupts
