@@ -33,24 +33,42 @@
 
 File SDClass::open(const char *path, uint8_t mode)
 {
-	File root = rootDir;
-	File f;
+	File ret, parent = rootDir;
 
-	if (mode > FILE_READ) return f; // TODO: writing not yet supported
-
-	if (strcmp(path, "/") == 0) {
-		f = rootDir;
-		return f;
+	//Serial.print("SD.open: ");
+	//Serial.println(path);
+	while (1) {
+		while (*path == '/') path++;
+		if (*path == 0) {
+			// end of pathname is "/", use last subdir
+			ret = parent;
+			break;
+		}
+		File next;
+		bool found = parent.find(path, &next);
+		const char *p = path;
+		do p++; while (*p != '/' && *p != 0);
+		if (found) {
+			//Serial.println("  open: found");
+			if (*p == 0) {
+				// found the file
+				ret = next;
+				break;
+			}
+			// found next subdir
+			parent = next;
+			path = p;
+		} else {
+			//Serial.print("  open: not found ");
+			//Serial.println(path);
+			if (*p == '/') break; // subdir doesn't exist
+			// file doesn't exist
+			if (mode == FILE_READ) break;
+			// TODO: for writing, create the file
+			break;
+		}
 	}
-	// TODO: this needs the path traversal feature
-
-	//Serial.println("SDClass::open");
-
-	//Serial.printf("rootDir.start_cluster = %d\n", rootDir.start_cluster);
-	//Serial.printf("root.start_cluster = %d\n", root.start_cluster);
-
-	root.find(path, &f);
-	return f;
+	return ret;
 }
 
 bool SDClass::exists(const char *path)
@@ -142,10 +160,11 @@ bool File::find(const char *filename, File *found)
 	//Serial.println("File::open");
 
 	const char *f = filename;
+	if (*f == 0) return false;
 	char *p = name83;
 	while (p < name83 + 11) {
 		char c = *f++;
-		if (c == 0) {
+		if (c == 0 || c == '/') {
 			while (p < name83 + 11) *p++ = ' ';
 			break;
 		}

@@ -187,7 +187,8 @@ bool File::seek(uint32_t pos)
 
 void File::close()
 {
-
+	type = FILE_INVALID;
+	namestr[0] = 0;
 }
 
 #endif
