@@ -31,6 +31,7 @@
 #define cache_t  SDCache::cache_t
 #define sector_t SDClass::sector_t
 
+cache_t *SDCache::cache_list = NULL;
 cache_t SDCache::cache[SD_CACHE_SIZE];
 
 #define CACHE_FLAG_HAS_DATA  1
@@ -50,6 +51,22 @@ static void print_sector(const void *data)
 }
 #endif
 
+void SDCache::print_cache(void)
+{
+#if 0
+	const cache_t *end=cache+SD_CACHE_SIZE;
+	for (cache_t *c = cache; c < end; c++) {
+		Serial.printf("      cache index %u, lba= %u, ucount=%u, flags=%u\n",
+			c - cache, c->lba, c->usagecount, c->flags);
+	}
+	Serial.print("      cache order:");
+	for (cache_t *c = cache_list; c; c = c->next) {
+		Serial.printf(" %u ->", c - cache);
+	}
+	Serial.println();
+#endif
+}
+
 // Read a sector into the cache.  If the sector is already cached,
 // of course no actual read occurs.  This is the primary function
 // used to access the SD card.
@@ -64,34 +81,26 @@ sector_t * SDCache::read(uint32_t lba, bool is_fat)
 	//Serial.printf("cache read: lba = %d\n", lba);
 	SPI.beginTransaction(SD_SPI_SPEED);
 	// does the cache already have the sector?
-	cache_t *c = find(lba);
+	cache_t *c = get(lba);
 	if (c) {
-		ret = &c->data;
-	} else {
-		c = empty();
-		if (c != NULL) {
-			// TODO: if dirty, write to SD card
+		if (c->flags & CACHE_FLAG_HAS_DATA) {
+			 //Serial.printf("   cache hit,  lba=%u\n", lba);
+			ret = &c->data;
+		} else {
 			if (SDClass::sd_read(lba, &c->data)) {
-				item = c;
-				c->lba = lba;
-				c->usagecount = 1;
 				c->flags = CACHE_FLAG_HAS_DATA;
 				if (is_fat) c->flags |= CACHE_FLAG_IS_FAT;
 				ret = &c->data;
-				 #ifdef PRINT_SECTORS
-				 Serial.printf("cache read %u\n", lba);
-				 print_sector(&c->data);
-				 #endif
+				 //Serial.printf("   cache miss, lba=%u\n", lba);
+			} else {
+				 //Serial.printf("   cache miss: read error, lba=%u\n", lba);
 			}
 		}
+	} else {
+		//Serial.printf("   cache full & all in use\n", lba);
 	}
-	//if (c) slot = c - cache, ucount = c->usagecount;
 	SPI.endTransaction();
-	//if (ret) {
-		//Serial.printf("read    %u, %u, slot %u\n", lba, ucount, slot);
-	//} else {
-		//Serial.printf("read    %u, FAIL\n", lba);
-	//}
+	//print_cache();
 	return ret;
 }
 
@@ -105,47 +114,99 @@ bool SDCache::read(uint32_t lba, void *buffer)
 	bool ret = true;
 
 	SPI.beginTransaction(SD_SPI_SPEED);
-	cache_t *c = find(lba);
-	if (!c) ret = SDClass::sd_read(lba, buffer);
+	cache_t *c = get(lba, false);
+	if (!c || !(c->flags & CACHE_FLAG_HAS_DATA)) {
+		ret = SDClass::sd_read(lba, buffer);
+	}
 	SPI.endTransaction();
-	if (c) memcpy(buffer, &c->data, 512);
+	if (c) {
+		if ((c->flags & CACHE_FLAG_HAS_DATA)) {
+			memcpy(buffer, &c->data, 512);
+			release();
+			return true;
+		}
+		release();
+	}
 	return ret;
 }
 
 
-sector_t * SDCache::alloc(uint32_t lba)
+// locate a sector in the cache.
+cache_t * SDCache::get(uint32_t lba, bool allocate)
 {
+	cache_t *c, *p=NULL, *last=NULL, *plast=NULL;
 
-	return NULL;
-}
-
-void SDCache::priority(signed int n)
-{
-	if (!item) return;
-	if (n > 0) {
-		__disable_irq();
-		signed int pri = (int)(item->priority) + n;
-		if (pri > 255) pri = 255;
-		item->priority = pri;
-		__enable_irq();
-	} else {
-		__disable_irq();
-		signed int pri = (int)(item->priority) + n;
-		if (pri < 0) pri = 0;
-		item->priority = pri;
-		__enable_irq();
+	// TODO: move initialization to a function called when the SD card is initialized
+	if (cache_list == NULL) init();
+	// have we already acquired a cache entry?
+	if (item) {
+		// if it's the desired block, use it
+		if (item->lba == lba) return item;
+		// if not, release our hold on it
+		release();
 	}
+	__disable_irq();
+	c = cache_list;
+	do {
+		if (c->lba == lba) {
+			if (p) {
+				p->next = c->next;
+				c->next = cache_list;
+				cache_list = c;
+			}
+			c->usagecount++;
+			__enable_irq();
+			item = c;
+			return item;
+		}
+		if (c->usagecount == 0) {
+			plast = p;
+			last = c;
+		}
+		p = c;
+		c = c->next;
+	} while (c);
+	if (allocate && last) {
+		if (plast) {
+			plast->next = last->next;
+			last->next = cache_list;
+			cache_list = last;
+		}
+		last->usagecount = 1;
+		// TODO: flush if dirty
+		last->lba = lba;
+		last->flags = 0;
+		item = last;
+	}
+	__enable_irq();
+	return item;
 }
 
-void SDCache::priority(uint32_t lba, signed int n)
+
+void SDCache::init(void)
 {
-	// TODO: if any a specific sector is cached, adjust its priority
+	cache_t *c = cache;
+	cache_t *end = c + SD_CACHE_SIZE;
+	//Serial.println("cache init");
+	__disable_irq();
+	do {
+		c->lba = 0xFFFFFFFF;
+		c->usagecount = 0;
+		c->flags = 0;
+		c->next = c + 1;
+		c = c + 1;
+	} while (c < end);
+	c--;
+	c->next = NULL;
+	cache_list = cache;
+	__enable_irq();
 }
+
 
 void SDCache::dirty(void)
 {
 	__disable_irq();
-	item->usagecount |= CACHE_FLAG_IS_DIRTY;
+	item->flags |= CACHE_FLAG_IS_DIRTY;
 	__enable_irq();
 }
 
@@ -163,49 +224,11 @@ void SDCache::release(void)
 	}
 }
 
-cache_t * SDCache::find(uint32_t lba)
-{
-	//Serial.printf("SDCache::find, lba=%n\n", lba);
-	// have we already acquired a cache entry?
-	if (item) {
-		//Serial.printf("  item exists, lba=%d\n", item->lba);
-		// if it's the desired block, use it
-		if (item->lba == lba) return item;
-		// if not, release our hold on it
-		//Serial.printf("cache find release\n");
-		item->usagecount--;
-		item = NULL;
-	}
-	// does the cache already have the sector we want?
-	const cache_t *end=cache+SD_CACHE_SIZE;
-	for (cache_t *c = cache; c < end; c++) {
-		if ((c->flags) && (c->lba == lba)) {
-			//Serial.printf("  item found\n");
-			item = c;
-			c->usagecount++;
-			return c;
-		}
-	}
-	//Serial.printf("  item not found\n");
-	// the desired sector isn't in the cache
-	return NULL;
-}
 
-cache_t * SDCache::empty(void)
-{
-	const cache_t *end=cache+SD_CACHE_SIZE;
-	cache_t *useme = NULL;
-	uint32_t lowest_priority = 0xFF;
 
-	for (cache_t *c = cache; c < end; c++) {
-		if (c->usagecount == 0 && c->priority < lowest_priority) {
-			useme = c;
-			lowest_priority = c->priority;
-			if (lowest_priority == 0) break;
-		}
-	}
-	return useme;
-}
+
+
+
 
 #endif
 #endif

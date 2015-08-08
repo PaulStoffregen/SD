@@ -94,6 +94,7 @@ bool SDClass::sd_read(uint32_t addr, void * data)
 	uint8_t r1 = recv_r1();
 	if (r1 != 0) {
 		end_cmd();
+		//Serial.println("    sd_read fail r1");
 		return false;
 	}
 	while (1) {
@@ -102,6 +103,7 @@ bool SDClass::sd_read(uint32_t addr, void * data)
 		if (token == 0xFE) break;
 		if (token != 0xFF) {
 			end_cmd();
+			//Serial.println("    sd_read fail token");
 			return false;
 		}
 		// TODO: timeout

@@ -213,25 +213,24 @@ private:
 	// no longer exists.
 	SDCache(void) { item = NULL; }
 	~SDCache(void) { release(); }
-	typedef struct {
+	typedef struct cache_struct {
 		SDClass::sector_t data;
 		uint32_t lba;
+		cache_struct * next;
 		uint8_t  usagecount;
-		uint8_t  priority;
 		uint8_t  flags;
 	} cache_t;
 	SDClass::sector_t * read(uint32_t lba, bool is_fat=false);
 	bool read(uint32_t lba, void *buffer);
-	SDClass::sector_t * alloc(uint32_t lba);
-	void priority(signed int n);
-	void priority(uint32_t lba, signed int n);
+	cache_t * get(uint32_t lba, bool allocate=true);
 	void dirty(void);
 	void flush(void);
 	void release(void);
-	cache_t * find(uint32_t lba);
-	cache_t * empty();
 	cache_t * item;
+	static cache_t *cache_list;
 	static cache_t cache[SD_CACHE_SIZE];
+	static void init(void);
+	static void print_cache(void);
 	friend class SDClass;
 	friend class File;
 };

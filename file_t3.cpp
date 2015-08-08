@@ -99,6 +99,9 @@ int File::read(void *buf, uint32_t size)
 	uint8_t *dest = (uint8_t *)buf;
 	uint32_t lba = custer_to_sector(current_cluster);
 	uint32_t sindex = cluster_offset(offset);
+
+	//Serial.printf(" read %u at %u  (%X)\n", size, offset, offset);
+
 	lba += sindex >> 9;
 	sindex &= 511;
 	if (sindex) {
@@ -106,13 +109,16 @@ int File::read(void *buf, uint32_t size)
 		do {
 			SDCache cache;
 			sector_t *sector = cache.read(lba);
-			if (!sector) return 0;
+			if (!sector) {
+				//Serial.println(" read err1, unable to read");
+				return 0;
+			}
 			uint32_t n = 512 - sindex;
 			if (size < n) {
 				// read does not consume all of the sector
 				memcpy(dest, sector->u8 + sindex, size);
 				offset += size;
-				cache.priority(+1);
+				//cache.priority(+1);
 				return size;
 			} else {
 				// read fully consumes this sector
@@ -120,11 +126,14 @@ int File::read(void *buf, uint32_t size)
 				dest += n;
 				count = n;
 				offset += n;
-				cache.priority(-1);
+				//cache.priority(-1);
 			}
 		} while (0);
 		if (is_new_cluster(++lba)) {
-			if (!next_cluster()) return count;
+			if (!next_cluster()) {
+				//Serial.print(" read err1, next cluster");
+				return count;
+			}
 		}
 		if (count >= size) return count;
 	}
@@ -136,11 +145,14 @@ int File::read(void *buf, uint32_t size)
 			if (n < 512) {
 				// only part of a sector is needed
 				sector_t *sector = cache.read(lba);
-				if (!sector) return count;
+				if (!sector) {
+					//Serial.println(" read err2, unable to read");
+					return count;
+				}
 				memcpy(dest, sector->u8, n);
 				offset += n;
 				count += n;
-				cache.priority(+1);
+				//cache.priority(+1);
 				return count;
 			} else {
 				// a full sector is required
@@ -151,7 +163,10 @@ int File::read(void *buf, uint32_t size)
 			}
 		} while (0);
 		if (is_new_cluster(++lba)) {
-			if (!next_cluster()) return count;
+			if (!next_cluster()) {
+				//Serial.print(" read err2, next cluster");
+				return count;
+			}
 		}
 		if (count >= size) return count;
 	}
@@ -162,6 +177,7 @@ bool File::seek(uint32_t pos)
 	if (type > FILE_WRITE) return false;
 	if (pos > length) return false;
 
+	//Serial.printf(" seek to %u\n", pos);
 	uint32_t save_cluster = current_cluster;
 	uint32_t count;
 	// TODO: if moving to a new lba, lower cache priority
