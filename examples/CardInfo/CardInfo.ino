@@ -98,11 +98,12 @@ void setup()
   
   volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
   volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-  volumesize *= 512;                            // SD card blocks are always 512 bytes
-  Serial.print("Volume size (bytes): ");
-  Serial.println(volumesize);
+  if (volumesize < 8388608ul) {
+    Serial.print("Volume size (bytes): ");
+    Serial.println(volumesize * 512);        // SD card blocks are always 512 bytes
+  }
   Serial.print("Volume size (Kbytes): ");
-  volumesize /= 1024;
+  volumesize /= 2;
   Serial.println(volumesize);
   Serial.print("Volume size (Mbytes): ");
   volumesize /= 1024;
