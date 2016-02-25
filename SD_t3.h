@@ -25,8 +25,13 @@
  */
 
 // This Teensy 3.x optimized version is a work-in-progress.
-// Uncomment this line to use the Teensy version.  Otherwise,
-// the normal SD library is used.
+//
+// Uncomment this line to use the Teensy version, which completely replaces
+// all of the normal Arduino SD library code.  The optimized version is
+// currently read-only.  It CAN NOT WRITE ANYTHING TO YOUR SD CARD.  However,
+// it is *much* faster for reading more than 1 file at a time, especially for
+// the Teensy Audio Library to play and mix multiple sound files.
+//
 //#define USE_TEENSY3_OPTIMIZED_CODE
 
 /* Why reinvent the SD library wheel...
