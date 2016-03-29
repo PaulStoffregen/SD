@@ -33,22 +33,25 @@
 #define NOINLINE __attribute__((noinline,unused))
 #define UNUSEDOK __attribute__((unused))
 //------------------------------------------------------------------------------
+// this unused FreeRam() function can cause compatibility issues
+// when __brkval isn't defined the way it expects
+// 
 /** Return the number of bytes currently free in RAM. */
-static UNUSEDOK int FreeRam(void) {
-  extern int  __bss_end;
-  extern int* __brkval;
-  int free_memory;
-  if (reinterpret_cast<int>(__brkval) == 0) {
-    // if no heap use from end of bss section
-    free_memory = reinterpret_cast<int>(&free_memory)
-                  - reinterpret_cast<int>(&__bss_end);
-  } else {
-    // use from top of stack to heap
-    free_memory = reinterpret_cast<int>(&free_memory)
-                  - reinterpret_cast<int>(__brkval);
-  }
-  return free_memory;
-}
+//static UNUSEDOK int FreeRam(void) {
+//  extern int  __bss_end;
+//  extern int* __brkval;
+//  int free_memory;
+//  if (reinterpret_cast<int>(__brkval) == 0) {
+//    // if no heap use from end of bss section
+//    free_memory = reinterpret_cast<int>(&free_memory)
+//                  - reinterpret_cast<int>(&__bss_end);
+//  } else {
+//    // use from top of stack to heap
+//    free_memory = reinterpret_cast<int>(&free_memory)
+//                  - reinterpret_cast<int>(__brkval);
+//  }
+//  return free_memory;
+//}
 //------------------------------------------------------------------------------
 /**
  * %Print a string in flash memory to the serial port.
