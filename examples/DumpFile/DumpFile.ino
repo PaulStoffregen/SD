@@ -9,6 +9,7 @@
  ** MOSI - pin 11, pin 7 on Teensy with audio board
  ** MISO - pin 12
  ** CLK - pin 13, pin 14 on Teensy with audio board
+ ** CS - pin 4, pin 10 on Teensy with audio board
  
  created  22 December 2010
  by Limor Fried
