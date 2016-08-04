@@ -7,10 +7,10 @@
  	
  The circuit:
   * SD card attached to SPI bus as follows:
- ** MOSI - pin 11 on Arduino Uno/Duemilanove/Diecimila
+ ** MOSI - pin 11 on Arduino Uno/Duemilanove/Diecimila, pin 7 on Teensy with audio board
  ** MISO - pin 12 on Arduino Uno/Duemilanove/Diecimila
- ** CLK - pin 13 on Arduino Uno/Duemilanove/Diecimila
- ** CS - depends on your SD card shield or module. 
+ ** CLK - pin 13 on Arduino Uno/Duemilanove/Diecimila, pin 14 on Teensy with audio board
+ ** CS - depends on your SD card shield or module - pin 10 on Teensy with audio board
  		Pin 4 used here for consistency with other Arduino examples
 
  
@@ -40,6 +40,10 @@ const int chipSelect = 4;
 
 void setup()
 {
+  //UNCOMMENT THESE TWO LINES FOR TEENSY AUDIO BOARD:
+  //SPI.setMOSI(7);  // Audio shield has MOSI on pin 7
+  //SPI.setSCK(14);  // Audio shield has SCK on pin 14
+  
  // Open serial communications and wait for port to open:
   Serial.begin(9600);
    while (!Serial) {
