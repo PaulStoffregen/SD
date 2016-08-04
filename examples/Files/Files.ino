@@ -4,10 +4,10 @@
  This example shows how to create and destroy an SD card file 	
  The circuit:
  * SD card attached to SPI bus as follows:
- ** MOSI - pin 11
+ ** MOSI - pin 11, pin 7 on Teensy with audio board
  ** MISO - pin 12
- ** CLK - pin 13
- ** CS - pin 4
+ ** CLK - pin 13, pin 14 on Teensy with audio board
+ ** CS - pin 4, pin 10 on Teensy with audio board
  
  created   Nov 2010
  by David A. Mellis
@@ -34,6 +34,10 @@ const int chipSelect = 4;
 
 void setup()
 {
+ //UNCOMMENT THESE TWO LINES FOR TEENSY AUDIO BOARD:
+ //SPI.setMOSI(7);  // Audio shield has MOSI on pin 7
+ //SPI.setSCK(14);  // Audio shield has SCK on pin 14
+  
  // Open serial communications and wait for port to open:
   Serial.begin(9600);
    while (!Serial) {
