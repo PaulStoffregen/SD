@@ -142,43 +142,6 @@ static void spiSend(uint8_t b) {
   while (!(SPI0_SR & SPI_SR_TCF)) {}
 }
 /** SPI send multiple bytes */
-#if 0
-static void spiSend(const uint8_t* output, size_t len) {
-  // clear any data in RX FIFO
-  SPI0_MCR = SPI_MCR_MSTR | SPI_MCR_CLR_RXF | SPI_MCR_PCSIS(0x1F);
-  // use 16 bit frame to avoid TD delay between frames
-  // send one byte if len is odd
-  if (len & 1) {
-    spiSend(*output++);
-    len--;
-  }
-  // initial number of words to push into TX FIFO
-  int nf = len/2 < SPI_INITIAL_FIFO_DEPTH ? len/2 : SPI_INITIAL_FIFO_DEPTH;
-  // limit for pushing data into TX fifo
-  const uint8_t* limit = output + len;
-  for (int i = 0; i < nf; i++) {
-    uint16_t w = (*output++) << 8;
-    w |= *output++;
-    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | w;
-  }
-  // write data to TX FIFO
-  while (output < limit) {
-    uint16_t w = *output++ << 8;
-    w |= *output++;
-    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
-    SPI0_PUSHR = SPI_PUSHR_CONT | SPI_PUSHR_CTAS(1) | w;
-    SPI0_POPR;
-  }
-  // wait for data to be sent
-  while (nf) {
-    while (!(SPI0_SR & SPI_SR_RXCTR)) {}
-    SPI0_POPR;
-    nf--;
-  }
-}
-#endif
-
-
 
 
 
@@ -234,32 +197,6 @@ uint8_t Sd2Card::cardCommand(uint8_t cmd, uint32_t arg) {
   return status_;
 }
 //------------------------------------------------------------------------------
-/**
- * Determine the size of an SD flash memory card.
- *
- * \return The number of 512 byte data blocks in the card
- *         or zero if an error occurs.
- */
-uint32_t Sd2Card::cardSize(void) {
-  csd_t csd;
-  if (!readCSD(&csd)) return 0;
-  if (csd.v1.csd_ver == 0) {
-    uint8_t read_bl_len = csd.v1.read_bl_len;
-    uint16_t c_size = (csd.v1.c_size_high << 10)
-                      | (csd.v1.c_size_mid << 2) | csd.v1.c_size_low;
-    uint8_t c_size_mult = (csd.v1.c_size_mult_high << 1)
-                          | csd.v1.c_size_mult_low;
-    return (uint32_t)(c_size + 1) << (c_size_mult + read_bl_len - 7);
-  } else if (csd.v2.csd_ver == 1) {
-    uint32_t c_size = ((uint32_t)csd.v2.c_size_high << 16)
-                      | (csd.v2.c_size_mid << 8) | csd.v2.c_size_low;
-    return (c_size + 1) << 10;
-  } else {
-    error(SD_CARD_ERROR_BAD_CSD);
-    return 0;
-  }
-}
-//------------------------------------------------------------------------------
 #ifdef SPI_HAS_TRANSACTION
 static uint8_t chip_select_asserted = 0;
 #endif
@@ -283,56 +220,6 @@ void Sd2Card::chipSelectLow(void) {
   digitalWrite(chipSelectPin_, LOW);
 }
 //------------------------------------------------------------------------------
-/** Erase a range of blocks.
- *
- * \param[in] firstBlock The address of the first block in the range.
- * \param[in] lastBlock The address of the last block in the range.
- *
- * \note This function requests the SD card to do a flash erase for a
- * range of blocks.  The data on the card after an erase operation is
- * either 0 or 1, depends on the card vendor.  The card must support
- * single block erase.
- *
- * \return The value one, true, is returned for success and
- * the value zero, false, is returned for failure.
- */
-uint8_t Sd2Card::erase(uint32_t firstBlock, uint32_t lastBlock) {
-  if (!eraseSingleBlockEnable()) {
-    error(SD_CARD_ERROR_ERASE_SINGLE_BLOCK);
-    goto fail;
-  }
-  if (type_ != SD_CARD_TYPE_SDHC) {
-    firstBlock <<= 9;
-    lastBlock <<= 9;
-  }
-  if (cardCommand(CMD32, firstBlock)
-    || cardCommand(CMD33, lastBlock)
-    || cardCommand(CMD38, 0)) {
-      error(SD_CARD_ERROR_ERASE);
-      goto fail;
-  }
-  if (!waitNotBusy(SD_ERASE_TIMEOUT)) {
-    error(SD_CARD_ERROR_ERASE_TIMEOUT);
-    goto fail;
-  }
-  chipSelectHigh();
-  return true;
-
- fail:
-  chipSelectHigh();
-  return false;
-}
-//------------------------------------------------------------------------------
-/** Determine if card supports single block erase.
- *
- * \return The value one, true, is returned if single block erase is supported.
- * The value zero, false, is returned if single block erase is not supported.
- */
-uint8_t Sd2Card::eraseSingleBlockEnable(void) {
-  csd_t csd;
-  return readCSD(&csd) ? csd.v1.erase_blk_en : 0;
-}
-//------------------------------------------------------------------------------
 /**
  * Initialize an SD flash memory card.
  *
@@ -344,7 +231,7 @@ uint8_t Sd2Card::eraseSingleBlockEnable(void) {
  * can be determined by calling errorCode() and errorData().
  */
 uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
-  errorCode_ = inBlock_ = partialBlockRead_ = type_ = 0;
+  errorCode_ = inBlock_ = type_ = 0;
   chipSelectPin_ = chipSelectPin;
   // 16-bit init start time allows over a minute
   uint16_t t0 = (uint16_t)millis();
@@ -431,24 +318,6 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
  fail:
   chipSelectHigh();
   return false;
-}
-//------------------------------------------------------------------------------
-/**
- * Enable or disable partial block reads.
- *
- * Enabling partial block reads improves performance by allowing a block
- * to be read over the SPI bus as several sub-blocks.  Errors may occur
- * if the time between reads is too long since the SD card may timeout.
- * The SPI SS line will be held low until the entire block is read or
- * readEnd() is called.
- *
- * Use this for applications like the Adafruit Wave Shield.
- *
- * \param[in] value The value TRUE (non-zero) or FALSE (zero).)
- */
-void Sd2Card::partialBlockRead(uint8_t value) {
-  readEnd();
-  partialBlockRead_ = value;
 }
 //------------------------------------------------------------------------------
 /**
@@ -540,7 +409,7 @@ uint8_t Sd2Card::readData(uint32_t block,
 #endif  // OPTIMIZE_HARDWARE_SPI
 
   offset_ += count;
-  if (!partialBlockRead_ || offset_ >= 512) {
+  if (offset_ >= 512) {
     // read rest of data, checksum and set chip select high
     readEnd();
   }
@@ -720,17 +589,6 @@ uint8_t Sd2Card::writeBlock(uint32_t blockNumber, const uint8_t* src) {
   return false;
 }
 //------------------------------------------------------------------------------
-/** Write one data block in a multiple block write sequence */
-uint8_t Sd2Card::writeData(const uint8_t* src) {
-  // wait for previous write to finish
-  if (!waitNotBusy(SD_WRITE_TIMEOUT)) {
-    error(SD_CARD_ERROR_WRITE_MULTIPLE);
-    chipSelectHigh();
-    return false;
-  }
-  return writeData(WRITE_MULTIPLE_TOKEN, src);
-}
-//------------------------------------------------------------------------------
 // send one block of data for write block or write multiple blocks
 uint8_t Sd2Card::writeData(uint8_t token, const uint8_t* src) {
 #ifdef OPTIMIZE_HARDWARE_SPI
@@ -765,59 +623,4 @@ uint8_t Sd2Card::writeData(uint8_t token, const uint8_t* src) {
     return false;
   }
   return true;
-}
-//------------------------------------------------------------------------------
-/** Start a write multiple blocks sequence.
- *
- * \param[in] blockNumber Address of first block in sequence.
- * \param[in] eraseCount The number of blocks to be pre-erased.
- *
- * \note This function is used with writeData() and writeStop()
- * for optimized multiple block writes.
- *
- * \return The value one, true, is returned for success and
- * the value zero, false, is returned for failure.
- */
-uint8_t Sd2Card::writeStart(uint32_t blockNumber, uint32_t eraseCount) {
-#if SD_PROTECT_BLOCK_ZERO
-  // don't allow write to first block
-  if (blockNumber == 0) {
-    error(SD_CARD_ERROR_WRITE_BLOCK_ZERO);
-    goto fail;
-  }
-#endif  // SD_PROTECT_BLOCK_ZERO
-  // send pre-erase count
-  if (cardAcmd(ACMD23, eraseCount)) {
-    error(SD_CARD_ERROR_ACMD23);
-    goto fail;
-  }
-  // use address if not SDHC card
-  if (type() != SD_CARD_TYPE_SDHC) blockNumber <<= 9;
-  if (cardCommand(CMD25, blockNumber)) {
-    error(SD_CARD_ERROR_CMD25);
-    goto fail;
-  }
-  return true;
-
- fail:
-  chipSelectHigh();
-  return false;
-}
-//------------------------------------------------------------------------------
-/** End a write multiple blocks sequence.
- *
-* \return The value one, true, is returned for success and
- * the value zero, false, is returned for failure.
- */
-uint8_t Sd2Card::writeStop(void) {
-  if (!waitNotBusy(SD_WRITE_TIMEOUT)) goto fail;
-  spiSend(STOP_TRAN_TOKEN);
-  if (!waitNotBusy(SD_WRITE_TIMEOUT)) goto fail;
-  chipSelectHigh();
-  return true;
-
- fail:
-  error(SD_CARD_ERROR_STOP_TRAN);
-  chipSelectHigh();
-  return false;
 }

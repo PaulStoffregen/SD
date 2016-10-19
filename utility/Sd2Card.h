@@ -127,10 +127,7 @@ uint8_t const SD_CARD_TYPE_SDHC = 3;
 class Sd2Card {
  public:
   /** Construct an instance of Sd2Card. */
-  Sd2Card(void) : errorCode_(0), inBlock_(0), partialBlockRead_(0), type_(0) {}
-  uint32_t cardSize(void);
-  uint8_t erase(uint32_t firstBlock, uint32_t lastBlock);
-  uint8_t eraseSingleBlockEnable(void);
+  Sd2Card(void) : errorCode_(0), inBlock_(0), type_(0) {}
   /**
    * \return error code for last error. See Sd2Card.h for a list of error codes.
    */
@@ -153,9 +150,7 @@ class Sd2Card {
     return init(sckRateID, SD_CHIP_SELECT_PIN);
   }
   uint8_t init(uint8_t sckRateID, uint8_t chipSelectPin);
-  void partialBlockRead(uint8_t value);
   /** Returns the current value, true or false, for partial block read. */
-  uint8_t partialBlockRead(void) const {return partialBlockRead_;}
   uint8_t readBlock(uint32_t block, uint8_t* dst);
   uint8_t readData(uint32_t block,
           uint16_t offset, uint16_t count, uint8_t* dst);
@@ -172,21 +167,16 @@ class Sd2Card {
   uint8_t readCSD(csd_t* csd) {
     return readRegister(CMD9, csd);
   }
-  void readEnd(void);
   uint8_t setSckRate(uint8_t sckRateID);
   /** Return the card type: SD V1, SD V2 or SDHC */
   uint8_t type(void) const {return type_;}
   uint8_t writeBlock(uint32_t blockNumber, const uint8_t* src);
-  uint8_t writeData(const uint8_t* src);
-  uint8_t writeStart(uint32_t blockNumber, uint32_t eraseCount);
-  uint8_t writeStop(void);
  private:
   uint32_t block_;
   uint8_t chipSelectPin_;
   uint8_t errorCode_;
   uint8_t inBlock_;
   uint16_t offset_;
-  uint8_t partialBlockRead_;
   uint8_t status_;
   uint8_t type_;
   // private functions
@@ -204,5 +194,6 @@ class Sd2Card {
   uint8_t waitNotBusy(uint16_t timeoutMillis);
   uint8_t writeData(uint8_t token, const uint8_t* src);
   uint8_t waitStartBlock(void);
+  void readEnd(void);
 };
 #endif  // Sd2Card_h
