@@ -31,7 +31,7 @@ static SPISettings settings;
 #define USE_TEENSY3_SPI
 
 // Teensy 3.0 functions  (copied from sdfatlib20130629)
-#include <mk20dx128.h>
+#include <kinetis.h>
 // Limit initial fifo to three entries to avoid fifo overrun
 #define SPI_INITIAL_FIFO_DEPTH 3
 // define some symbols that are not in mk20dx128.h
@@ -329,9 +329,6 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
  */
 uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst)
 {
-  uint16_t offset=0;
-  uint16_t count=512;
-
   // use address if not SDHC card
   if (type() != SD_CARD_TYPE_SDHC) block <<= 9;
   if (cardCommand(CMD17, block)) {
@@ -341,10 +338,10 @@ uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst)
   if (!waitStartBlock()) {
     goto fail;
   }
-#if defined(USE_TEENSY3_SPI)
-  spiRec(dst, count);
+#ifdef USE_TEENSY3_SPI
+  spiRec(dst, 512);
   spiRecIgnore(2);
-#elif defined(OPTIMIZE_HARDWARE_SPI)
+#else  // OPTIMIZE_HARDWARE_SPI
   // start first spi transfer
   SPDR = 0XFF;
   // transfer data
@@ -357,15 +354,6 @@ uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst)
   while (!(SPSR & (1 << SPIF)));
   dst[511] = SPDR;
   // skip CRC bytes
-  SPDR = 0XFF;
-  while (!(SPSR & (1 << SPIF)));
-  SPDR = 0XFF;
-  while (!(SPSR & (1 << SPIF)));
-#else  // SPI library
-  // transfer data
-  for (uint16_t i = 0; i < 512; i++) {
-    dst[i] = spiRec();
-  }
   spiRec();
   spiRec();
 #endif
@@ -463,18 +451,14 @@ uint8_t Sd2Card::waitStartBlock(void) {
   while ((status_ = spiRec()) == 0XFF) {
     if (((uint16_t)millis() - t0) > SD_READ_TIMEOUT) {
       error(SD_CARD_ERROR_READ_TIMEOUT);
-      goto fail;
+      return false;
     }
   }
   if (status_ != DATA_START_BLOCK) {
     error(SD_CARD_ERROR_READ);
-    goto fail;
+    return false;
   }
   return true;
-
- fail:
-  chipSelectHigh();
-  return false;
 }
 //------------------------------------------------------------------------------
 /**
