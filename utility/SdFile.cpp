@@ -693,9 +693,8 @@ int16_t SdFile::read(void* buf, uint16_t nbyte) {
     if (n > (512 - offset)) n = 512 - offset;
 
     // no buffering needed if n == 512 or user requests no buffering
-    if ((unbufferedRead() || n == 512) &&
-      block != SdVolume::cacheBlockNumber_) {
-      if (!vol_->readData(block, offset, n, dst)) return -1;
+    if ((unbufferedRead() || n == 512) && block != SdVolume::cacheBlockNumber_) {
+      if (!vol_->readBlock(block, dst)) return -1;
       dst += n;
     } else {
       // read block to cache and copy data to caller

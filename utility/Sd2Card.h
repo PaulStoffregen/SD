@@ -127,7 +127,7 @@ uint8_t const SD_CARD_TYPE_SDHC = 3;
 class Sd2Card {
  public:
   /** Construct an instance of Sd2Card. */
-  Sd2Card(void) : errorCode_(0), inBlock_(0), type_(0) {}
+  Sd2Card(void) : errorCode_(0), type_(0) {}
   /**
    * \return error code for last error. See Sd2Card.h for a list of error codes.
    */
@@ -152,8 +152,6 @@ class Sd2Card {
   uint8_t init(uint8_t sckRateID, uint8_t chipSelectPin);
   /** Returns the current value, true or false, for partial block read. */
   uint8_t readBlock(uint32_t block, uint8_t* dst);
-  uint8_t readData(uint32_t block,
-          uint16_t offset, uint16_t count, uint8_t* dst);
   /**
    * Read a cards CID register. The CID contains card identification
    * information such as Manufacturer ID, Product name, Product serial
@@ -172,11 +170,8 @@ class Sd2Card {
   uint8_t type(void) const {return type_;}
   uint8_t writeBlock(uint32_t blockNumber, const uint8_t* src);
  private:
-  uint32_t block_;
   uint8_t chipSelectPin_;
   uint8_t errorCode_;
-  uint8_t inBlock_;
-  uint16_t offset_;
   uint8_t status_;
   uint8_t type_;
   // private functions
@@ -194,6 +189,7 @@ class Sd2Card {
   uint8_t waitNotBusy(uint16_t timeoutMillis);
   uint8_t writeData(uint8_t token, const uint8_t* src);
   uint8_t waitStartBlock(void);
-  void readEnd(void);
+  uint8_t readData(uint32_t block,
+          uint16_t offset, uint16_t count, uint8_t* dst);
 };
 #endif  // Sd2Card_h

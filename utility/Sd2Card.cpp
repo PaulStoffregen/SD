@@ -170,10 +170,8 @@ static  uint8_t spiRec(void) {
 
 //------------------------------------------------------------------------------
 // send command and return error code.  Return zero for OK
-uint8_t Sd2Card::cardCommand(uint8_t cmd, uint32_t arg) {
-  // end read if in partialBlockRead mode
-  readEnd();
-
+uint8_t Sd2Card::cardCommand(uint8_t cmd, uint32_t arg)
+{
   // select card
   chipSelectLow();
 
@@ -231,7 +229,7 @@ void Sd2Card::chipSelectLow(void) {
  * can be determined by calling errorCode() and errorData().
  */
 uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
-  errorCode_ = inBlock_ = type_ = 0;
+  errorCode_ = type_ = 0;
   chipSelectPin_ = chipSelectPin;
   // 16-bit init start time allows over a minute
   uint16_t t0 = (uint16_t)millis();
@@ -329,121 +327,54 @@ uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
  * \return The value one, true, is returned for success and
  * the value zero, false, is returned for failure.
  */
-uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst) {
-  return readData(block, 0, 512, dst);
-}
-//------------------------------------------------------------------------------
-/**
- * Read part of a 512 byte block from an SD card.
- *
- * \param[in] block Logical block to be read.
- * \param[in] offset Number of bytes to skip at start of block
- * \param[out] dst Pointer to the location that will receive the data.
- * \param[in] count Number of bytes to read
- * \return The value one, true, is returned for success and
- * the value zero, false, is returned for failure.
- */
-uint8_t Sd2Card::readData(uint32_t block,
-        uint16_t offset, uint16_t count, uint8_t* dst) {
-#if !defined(USE_TEENSY3_SPI) && defined(OPTIMIZE_HARDWARE_SPI)
-  uint16_t n;
-#endif
-  if (count == 0) return true;
-  if ((count + offset) > 512) {
+uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst)
+{
+  uint16_t offset=0;
+  uint16_t count=512;
+
+  // use address if not SDHC card
+  if (type() != SD_CARD_TYPE_SDHC) block <<= 9;
+  if (cardCommand(CMD17, block)) {
+    error(SD_CARD_ERROR_CMD17);
     goto fail;
   }
-  if (!inBlock_ || block != block_ || offset < offset_) {
-    block_ = block;
-    // use address if not SDHC card
-    if (type()!= SD_CARD_TYPE_SDHC) block <<= 9;
-    if (cardCommand(CMD17, block)) {
-      error(SD_CARD_ERROR_CMD17);
-      goto fail;
-    }
-    if (!waitStartBlock()) {
-      goto fail;
-    }
-    offset_ = 0;
-    inBlock_ = 1;
+  if (!waitStartBlock()) {
+    goto fail;
   }
-
 #if defined(USE_TEENSY3_SPI)
-
-  // skip data before offset
-  //for (;offset_ < offset; offset_++) {
-    //spiRec();
-  //}
-  spiRecIgnore(offset);
   spiRec(dst, count);
-
+  spiRecIgnore(2);
 #elif defined(OPTIMIZE_HARDWARE_SPI)
   // start first spi transfer
   SPDR = 0XFF;
-
-  // skip data before offset
-  for (;offset_ < offset; offset_++) {
-    while (!(SPSR & (1 << SPIF)));
-    SPDR = 0XFF;
-  }
   // transfer data
-  n = count - 1;
-  for (uint16_t i = 0; i < n; i++) {
+  for (uint16_t i = 0; i < 511; i++) {
     while (!(SPSR & (1 << SPIF)));
     dst[i] = SPDR;
     SPDR = 0XFF;
   }
   // wait for last byte
   while (!(SPSR & (1 << SPIF)));
-  dst[n] = SPDR;
-
-#else  // OPTIMIZE_HARDWARE_SPI
-
-  // skip data before offset
-  for (;offset_ < offset; offset_++) {
-    spiRec();
-  }
+  dst[511] = SPDR;
+  // skip CRC bytes
+  SPDR = 0XFF;
+  while (!(SPSR & (1 << SPIF)));
+  SPDR = 0XFF;
+  while (!(SPSR & (1 << SPIF)));
+#else  // SPI library
   // transfer data
-  for (uint16_t i = 0; i < count; i++) {
+  for (uint16_t i = 0; i < 512; i++) {
     dst[i] = spiRec();
   }
-#endif  // OPTIMIZE_HARDWARE_SPI
-
-  offset_ += count;
-  if (offset_ >= 512) {
-    // read rest of data, checksum and set chip select high
-    readEnd();
-  }
+  spiRec();
+  spiRec();
+#endif
+  chipSelectHigh();
   return true;
 
  fail:
   chipSelectHigh();
   return false;
-}
-//------------------------------------------------------------------------------
-/** Skip remaining data in a block when in partial block read mode. */
-void Sd2Card::readEnd(void) {
-  if (inBlock_) {
-      // skip data and crc
-#if defined(USE_TEENSY3_SPI)
-    if (offset_ < 514) {
-      spiRecIgnore(514 - offset_);
-      offset_ = 514;
-    }
-#elif defined(OPTIMIZE_HARDWARE_SPI)
-    // optimize skip for hardware
-    SPDR = 0XFF;
-    while (offset_++ < 513) {
-      while (!(SPSR & (1 << SPIF)));
-      SPDR = 0XFF;
-    }
-    // wait for last crc byte
-    while (!(SPSR & (1 << SPIF)));
-#else  // OPTIMIZE_HARDWARE_SPI
-    while (offset_++ < 514) spiRec();
-#endif  // OPTIMIZE_HARDWARE_SPI
-    chipSelectHigh();
-    inBlock_ = 0;
-  }
 }
 //------------------------------------------------------------------------------
 /** read CID or CSR register */
