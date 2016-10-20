@@ -28,3 +28,4 @@ size	KEYWORD2
 #######################################
 FILE_READ	LITERAL1
 FILE_WRITE	LITERAL1
+BUILTIN_SDCARD	LITERAL1

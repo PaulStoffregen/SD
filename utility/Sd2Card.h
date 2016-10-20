@@ -74,6 +74,16 @@ uint8_t const SD_CARD_TYPE_SD2 = 2;
 /** High Capacity SD card */
 uint8_t const SD_CARD_TYPE_SDHC = 3;
 //------------------------------------------------------------------------------
+#if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+extern "C" {
+uint8_t KinetisSDHC_InitCard(void);
+uint8_t KinetisSDHC_GetCardType(void);
+int KinetisSDHC_ReadBlock(void * buff, uint32_t sector);
+int KinetisSDHC_WriteBlock(const void * buff, uint32_t sector);
+}
+#endif
+#define BUILTIN_SDCARD 254
+//------------------------------------------------------------------------------
 /**
  * \class Sd2Card
  * \brief Raw access to SD and SDHC flash memory cards.
@@ -84,17 +94,45 @@ class Sd2Card {
   Sd2Card(void) : type_(0) {}
   /* Initialize an SD flash memory card with the selected SPI clock rate
    * and the SD chip select pin.  */
-  uint8_t init(uint8_t sckRateID, uint8_t chipSelectPin);
+  uint8_t init(uint8_t sckRateID, uint8_t chipSelectPin) {
+    #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+    if (chipSelectPin == BUILTIN_SDCARD) {
+      chipSelectPin_ = BUILTIN_SDCARD;
+      uint8_t ret = KinetisSDHC_InitCard();
+      type_ = KinetisSDHC_GetCardType();
+      return (ret == 0) ? true : false;
+    }
+    #endif
+    return SD_init(sckRateID, chipSelectPin);
+  }
+  /* return the type of SD card detected during init() */
   uint8_t type(void) const {return type_;}
   /** Returns the current value, true or false, for partial block read. */
-  uint8_t readBlock(uint32_t block, uint8_t* dst);
+  uint8_t readBlock(uint32_t block, uint8_t* dst) {
+    #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+    if (chipSelectPin_ == BUILTIN_SDCARD) {
+      return (KinetisSDHC_ReadBlock(dst, block) == 0) ? true : false;
+    }
+    #endif
+    return SD_readBlock(block, dst);
+  }
   /** Return the card type: SD V1, SD V2 or SDHC */
-  uint8_t writeBlock(uint32_t blockNumber, const uint8_t* src);
+  uint8_t writeBlock(uint32_t block, const uint8_t* src) {
+    #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+    if (chipSelectPin_ == BUILTIN_SDCARD) {
+      return (KinetisSDHC_WriteBlock(src, block) == 0) ? true : false;
+    }
+    #endif
+    return SD_writeBlock(block, src);
+  }
  private:
   uint8_t chipSelectPin_;
   uint8_t status_;
   uint8_t type_;
   // private functions
+  uint8_t SD_init(uint8_t sckRateID, uint8_t chipSelectPin);
+  uint8_t SD_readBlock(uint32_t block, uint8_t* dst);
+  uint8_t SD_writeBlock(uint32_t blockNumber, const uint8_t* src);
   uint8_t cardAcmd(uint8_t cmd, uint32_t arg) {
     cardCommand(CMD55, 0);
     return cardCommand(cmd, arg);

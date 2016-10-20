@@ -220,7 +220,7 @@ void Sd2Card::chipSelectLow(void) {
  * \return The value one, true, is returned for success and
  * the value zero, false, is returned for failure.
  */
-uint8_t Sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin) {
+uint8_t Sd2Card::SD_init(uint8_t sckRateID, uint8_t chipSelectPin) {
   type_ = 0;
   chipSelectPin_ = chipSelectPin;
   // 16-bit init start time allows over a minute
@@ -314,7 +314,7 @@ fail:
  * \return The value one, true, is returned for success and
  * the value zero, false, is returned for failure.
  */
-uint8_t Sd2Card::readBlock(uint32_t block, uint8_t* dst)
+uint8_t Sd2Card::SD_readBlock(uint32_t block, uint8_t* dst)
 {
   // use address if not SDHC card
   if (type_ != SD_CARD_TYPE_SDHC) block <<= 9;
@@ -434,7 +434,7 @@ uint8_t Sd2Card::waitStartBlock(void) {
  * \return The value one, true, is returned for success and
  * the value zero, false, is returned for failure.
  */
-uint8_t Sd2Card::writeBlock(uint32_t blockNumber, const uint8_t* src) {
+uint8_t Sd2Card::SD_writeBlock(uint32_t blockNumber, const uint8_t* src) {
 #if SD_PROTECT_BLOCK_ZERO
   // don't allow write to first block
   if (blockNumber == 0) {
