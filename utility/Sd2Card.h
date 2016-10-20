@@ -66,52 +66,6 @@ uint16_t const SD_READ_TIMEOUT = 300;
 /** write time out ms */
 uint16_t const SD_WRITE_TIMEOUT = 600;
 //------------------------------------------------------------------------------
-// SD card errors
-/** timeout error for command CMD0 */
-uint8_t const SD_CARD_ERROR_CMD0 = 0X1;
-/** CMD8 was not accepted - not a valid SD card*/
-uint8_t const SD_CARD_ERROR_CMD8 = 0X2;
-/** card returned an error response for CMD17 (read block) */
-uint8_t const SD_CARD_ERROR_CMD17 = 0X3;
-/** card returned an error response for CMD24 (write block) */
-uint8_t const SD_CARD_ERROR_CMD24 = 0X4;
-/**  WRITE_MULTIPLE_BLOCKS command failed */
-uint8_t const SD_CARD_ERROR_CMD25 = 0X05;
-/** card returned an error response for CMD58 (read OCR) */
-uint8_t const SD_CARD_ERROR_CMD58 = 0X06;
-/** SET_WR_BLK_ERASE_COUNT failed */
-uint8_t const SD_CARD_ERROR_ACMD23 = 0X07;
-/** card's ACMD41 initialization process timeout */
-uint8_t const SD_CARD_ERROR_ACMD41 = 0X08;
-/** card returned a bad CSR version field */
-uint8_t const SD_CARD_ERROR_BAD_CSD = 0X09;
-/** erase block group command failed */
-uint8_t const SD_CARD_ERROR_ERASE = 0X0A;
-/** card not capable of single block erase */
-uint8_t const SD_CARD_ERROR_ERASE_SINGLE_BLOCK = 0X0B;
-/** Erase sequence timed out */
-uint8_t const SD_CARD_ERROR_ERASE_TIMEOUT = 0X0C;
-/** card returned an error token instead of read data */
-uint8_t const SD_CARD_ERROR_READ = 0X0D;
-/** read CID or CSD failed */
-uint8_t const SD_CARD_ERROR_READ_REG = 0X0E;
-/** timeout while waiting for start of read data */
-uint8_t const SD_CARD_ERROR_READ_TIMEOUT = 0X0F;
-/** card did not accept STOP_TRAN_TOKEN */
-uint8_t const SD_CARD_ERROR_STOP_TRAN = 0X10;
-/** card returned an error token as a response to a write operation */
-uint8_t const SD_CARD_ERROR_WRITE = 0X11;
-/** attempt to write protected block zero */
-uint8_t const SD_CARD_ERROR_WRITE_BLOCK_ZERO = 0X12;
-/** card did not go ready for a multiple block write */
-uint8_t const SD_CARD_ERROR_WRITE_MULTIPLE = 0X13;
-/** card returned an error to a CMD13 status check after a write */
-uint8_t const SD_CARD_ERROR_WRITE_PROGRAMMING = 0X14;
-/** timeout occurred during write programming */
-uint8_t const SD_CARD_ERROR_WRITE_TIMEOUT = 0X15;
-/** incorrect rate selected */
-uint8_t const SD_CARD_ERROR_SCK_RATE = 0X16;
-//------------------------------------------------------------------------------
 // card types
 /** Standard capacity V1 SD card */
 uint8_t const SD_CARD_TYPE_SD1 = 1;
@@ -127,51 +81,17 @@ uint8_t const SD_CARD_TYPE_SDHC = 3;
 class Sd2Card {
  public:
   /** Construct an instance of Sd2Card. */
-  Sd2Card(void) : errorCode_(0), type_(0) {}
-  /**
-   * \return error code for last error. See Sd2Card.h for a list of error codes.
-   */
-  uint8_t errorCode(void) const {return errorCode_;}
-  /** \return error data for last error. */
-  uint8_t errorData(void) const {return status_;}
-  /**
-   * Initialize an SD flash memory card with default clock rate and chip
-   * select pin.  See sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin).
-   */
-  uint8_t init(void) {
-    return init(SPI_FULL_SPEED, SD_CHIP_SELECT_PIN);
-  }
-  /**
-   * Initialize an SD flash memory card with the selected SPI clock rate
-   * and the default SD chip select pin.
-   * See sd2Card::init(uint8_t sckRateID, uint8_t chipSelectPin).
-   */
-  uint8_t init(uint8_t sckRateID) {
-    return init(sckRateID, SD_CHIP_SELECT_PIN);
-  }
+  Sd2Card(void) : type_(0) {}
+  /* Initialize an SD flash memory card with the selected SPI clock rate
+   * and the SD chip select pin.  */
   uint8_t init(uint8_t sckRateID, uint8_t chipSelectPin);
+  uint8_t type(void) const {return type_;}
   /** Returns the current value, true or false, for partial block read. */
   uint8_t readBlock(uint32_t block, uint8_t* dst);
-  /**
-   * Read a cards CID register. The CID contains card identification
-   * information such as Manufacturer ID, Product name, Product serial
-   * number and Manufacturing date. */
-  uint8_t readCID(cid_t* cid) {
-    return readRegister(CMD10, cid);
-  }
-  /**
-   * Read a cards CSD register. The CSD contains Card-Specific Data that
-   * provides information regarding access to the card's contents. */
-  uint8_t readCSD(csd_t* csd) {
-    return readRegister(CMD9, csd);
-  }
-  uint8_t setSckRate(uint8_t sckRateID);
   /** Return the card type: SD V1, SD V2 or SDHC */
-  uint8_t type(void) const {return type_;}
   uint8_t writeBlock(uint32_t blockNumber, const uint8_t* src);
  private:
   uint8_t chipSelectPin_;
-  uint8_t errorCode_;
   uint8_t status_;
   uint8_t type_;
   // private functions
@@ -180,7 +100,6 @@ class Sd2Card {
     return cardCommand(cmd, arg);
   }
   uint8_t cardCommand(uint8_t cmd, uint32_t arg);
-  void error(uint8_t code) {errorCode_ = code;}
   uint8_t readRegister(uint8_t cmd, void* buf);
   uint8_t sendWriteCommand(uint32_t blockNumber, uint32_t eraseCount);
   void chipSelectHigh(void);
@@ -189,7 +108,6 @@ class Sd2Card {
   uint8_t waitNotBusy(uint16_t timeoutMillis);
   uint8_t writeData(uint8_t token, const uint8_t* src);
   uint8_t waitStartBlock(void);
-  uint8_t readData(uint32_t block,
-          uint16_t offset, uint16_t count, uint8_t* dst);
+  uint8_t setSckRate(uint8_t sckRateID);
 };
 #endif  // Sd2Card_h
