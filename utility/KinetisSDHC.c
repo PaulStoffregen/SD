@@ -9,7 +9,8 @@
 #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
 
 #include "kinetis.h"
-#include "core_pins.h" // testing only
+//#include "core_pins.h" // testing only
+//#include "HardwareSerial.h" // testing only
 
 // Missing in Teensyduino 1.30
 #ifndef MPU_CESR_VLD_MASK
@@ -28,6 +29,19 @@ enum {
         SDHC_RESULT_PARERR,             /* 4: Invalid Parameter */
         SDHC_RESULT_NO_RESPONSE         /* 5: No Response */ // from old diskio.h
 };
+
+/*void print_result(int n)
+{
+        switch (n) {
+        case SDHC_RESULT_OK: serial_print("OK\n"); break;
+        case SDHC_RESULT_ERROR: serial_print("R/W Error\n"); break;
+        case SDHC_RESULT_WRPRT: serial_print("Write Protect\n"); break;
+        case SDHC_RESULT_NOT_READY: serial_print("Not Ready\n"); break;
+        case SDHC_RESULT_PARERR: serial_print("Invalid Param\n"); break;
+        case SDHC_RESULT_NO_RESPONSE: serial_print("No Response\n"); break;
+        default: serial_print("Unknown result\n");
+        }
+}*/
 
 #define SDHC_STATUS_NOINIT              0x01    /* Drive not initialized */
 #define SDHC_STATUS_NODISK              0x02    /* No medium in the drive */
@@ -339,17 +353,17 @@ uint8_t KinetisSDHC_InitCard(void)
   }
 
   resR = SDHC_CMD8_SetInterface(0x000001AA); // 3.3V and AA check pattern
-  if (resR > 0) {
-    sdCardDesc.status = SDHC_STATUS_NOINIT;
-    return SDHC_STATUS_NOINIT;
-  }
-
-  if (resR == 0) {
+  if (resR == SDHC_RESULT_OK) {
       if (SDHC_CMDRSP0 != 0x000001AA) {
         sdCardDesc.status = SDHC_STATUS_NOINIT;
         return SDHC_STATUS_NOINIT;
       }
       sdCardDesc.highCapacity = 1;
+  } else if (resR == SDHC_RESULT_NO_RESPONSE) {
+      // version 1 cards do not respond to CMD8
+  } else {
+    sdCardDesc.status = SDHC_STATUS_NOINIT;
+    return SDHC_STATUS_NOINIT;
   }
 
   if (SDHC_ACMD41_SendOperationCond(0)) {
