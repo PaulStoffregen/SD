@@ -228,6 +228,7 @@ static SD_CARD_DESCRIPTOR sdCardDesc;
 * Private functions
 ******************************************************************************/
 
+static uint8_t SDHC_Init(void);
 static void SDHC_InitGPIO(void);
 static void SDHC_ReleaseGPIO(void);
 static void SDHC_SetClock(uint32_t sysctl);
@@ -259,8 +260,10 @@ static int SDHC_ACMD41_SendOperationCond(uint32_t cond);
 
 // initialize the SDHC Controller
 // returns status of initialization(OK, nonInit, noCard, CardProtected)
-uint8_t SDHC_Init(void)
+static uint8_t SDHC_Init(void)
 {
+	int i;
+
 	// Enable clock to SDHC peripheral
 	SIM_SCGC3 |= SIM_SCGC3_SDHC;
 
@@ -270,7 +273,7 @@ uint8_t SDHC_Init(void)
 	SIM_SCGC6 |= SIM_SCGC6_DMAMUX;
 	SIM_SCGC7 |= SIM_SCGC7_DMA;
 
-	// Switch of MPU unit (maybe bug of silicon)
+	// Enable DMA access via MPU (not currently used)
 	MPU_CESR &= ~MPU_CESR_VLD_MASK;
 
 	// De-init GPIO - to prevent unwanted clocks on bus
@@ -304,9 +307,13 @@ uint8_t SDHC_Init(void)
 		SDHC_IRQSTATEN_BRRSEN | SDHC_IRQSTATEN_BWRSEN | SDHC_IRQSTATEN_DINTSEN |
 		SDHC_IRQSTATEN_CRMSEN | SDHC_IRQSTATEN_TCSEN | SDHC_IRQSTATEN_CCSEN;
 
-	/* 80 initial clocks */
-	SDHC_SYSCTL |= SDHC_SYSCTL_INITA;
-	while (SDHC_SYSCTL & SDHC_SYSCTL_INITA) { };
+	// initial clocks... SD spec says only 74 clocks are needed, but if Teensy rebooted
+	// while the card was in middle of an operation, thousands of clock cycles can be
+	// needed to get the card to complete a prior command and return to a usable state.
+	for (i=0; i < 50; i++) {
+		SDHC_SYSCTL |= SDHC_SYSCTL_INITA;
+		while (SDHC_SYSCTL & SDHC_SYSCTL_INITA) { };
+	}
 
 	// to do - check if this needed
 	SDHC_IRQSTAT |= SDHC_IRQSTAT_CRM;
