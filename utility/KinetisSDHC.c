@@ -310,7 +310,7 @@ static uint8_t SDHC_Init(void)
 	// initial clocks... SD spec says only 74 clocks are needed, but if Teensy rebooted
 	// while the card was in middle of an operation, thousands of clock cycles can be
 	// needed to get the card to complete a prior command and return to a usable state.
-	for (i=0; i < 50; i++) {
+	for (i=0; i < 500; i++) {
 		SDHC_SYSCTL |= SDHC_SYSCTL_INITA;
 		while (SDHC_SYSCTL & SDHC_SYSCTL_INITA) { };
 	}
