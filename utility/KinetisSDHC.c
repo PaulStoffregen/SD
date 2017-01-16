@@ -126,7 +126,7 @@ enum {
 // prescale can be 2, 4, 8, 16, 32, 64, 128, 256
 // divisor can be 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
 #define SDHC_SYSCTL_DIVISOR(prescale, divisor) \
-	(SDHC_SYSCTL_DVS((prescale)>>1)|SDHC_SYSCTL_SDCLKFS((divisor)-1))
+	(SDHC_SYSCTL_SDCLKFS((prescale)>>1)|SDHC_SYSCTL_DVS((divisor)-1))
 
 #if (F_CPU == 240000000)
   #define SDHC_SYSCTL_400KHZ  SDHC_SYSCTL_DIVISOR(64, 10) // 375 kHz
