@@ -88,6 +88,10 @@ public:
   
   boolean rmdir(const char *filepath);
 
+  Sd2Card& getCard() { return card; }
+  SdVolume& getVolume() { return volume; }
+  SdFile& getRoot() { return root; }
+
 private:
 
   // This is used to determine the mode used to open a file
