@@ -657,7 +657,7 @@ void SdFile::printTwoDigits(uint8_t v) {
  * read() called before a file has been opened, corrupt file system
  * or an I/O error occurred.
  */
-int16_t SdFile::read(void* buf, uint16_t nbyte) {
+int32_t SdFile::read(void* buf, size_t nbyte) {
   uint8_t* dst = reinterpret_cast<uint8_t*>(buf);
 
   // error if not open or write only
@@ -667,7 +667,7 @@ int16_t SdFile::read(void* buf, uint16_t nbyte) {
   if (nbyte > (fileSize_ - curPosition_)) nbyte = fileSize_ - curPosition_;
 
   // amount left to read
-  uint16_t toRead = nbyte;
+  uint32_t toRead = nbyte;
   while (toRead > 0) {
     uint32_t block;  // raw device block number
     uint16_t offset = curPosition_ & 0X1FF;  // offset in block
@@ -687,7 +687,7 @@ int16_t SdFile::read(void* buf, uint16_t nbyte) {
       }
       block = vol_->clusterStartBlock(curCluster_) + blockOfCluster;
     }
-    uint16_t n = toRead;
+    int32_t n = toRead;
 
     // amount to be read from current block
     if (n > (512 - offset)) n = 512 - offset;
@@ -1120,12 +1120,12 @@ uint8_t SdFile::truncate(uint32_t length) {
  * for a read-only file, device is full, a corrupt file system or an I/O error.
  *
  */
-size_t SdFile::write(const void* buf, uint16_t nbyte) {
+size_t SdFile::write(const void* buf, size_t nbyte) {
   // convert void* to uint8_t*  -  must be before goto statements
   const uint8_t* src = reinterpret_cast<const uint8_t*>(buf);
 
   // number of bytes left to write  -  must be before goto statements
-  uint16_t nToWrite = nbyte;
+  size_t nToWrite = nbyte;
 
   // error if not a normal file or is read-only
   if (!isFile() || !(flags_ & O_WRITE)) goto writeErrorReturn;
