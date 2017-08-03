@@ -561,13 +561,14 @@ static void SDHC_InitGPIO(void)
 // release the SDHC Controller signals
 static void SDHC_ReleaseGPIO(void)
 {
-  PORTE_PCR0 = 0;
-  PORTE_PCR1 = 0;
-  PORTE_PCR2 = 0;
-  PORTE_PCR3 = 0;
-  PORTE_PCR4 = 0;
-  PORTE_PCR5 = 0;
+  PORTE_PCR0 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.D1  */
+  PORTE_PCR1 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.D0  */
+  PORTE_PCR2 = 0;						/* SDHC.CLK */
+  PORTE_PCR3 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.CMD */
+  PORTE_PCR4 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS;	/* PULLUP SDHC.D3  */
+  PORTE_PCR5 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.D2  */
 }
+
 
 
 static void SDHC_SetClock(uint32_t sysctl)
