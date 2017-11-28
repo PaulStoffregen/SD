@@ -58,13 +58,13 @@ uint8_t const  SPI_SCK_PIN = SCK_PIN;
 /** Protect block zero from write if nonzero */
 #define SD_PROTECT_BLOCK_ZERO 1
 /** init timeout ms */
-uint16_t const SD_INIT_TIMEOUT = 2000;
+const unsigned int SD_INIT_TIMEOUT = 2000;
 /** erase timeout ms */
-uint16_t const SD_ERASE_TIMEOUT = 10000;
+const unsigned int SD_ERASE_TIMEOUT = 10000;
 /** read timeout ms */
-uint16_t const SD_READ_TIMEOUT = 300;
+const unsigned int SD_READ_TIMEOUT = 300;
 /** write time out ms */
-uint16_t const SD_WRITE_TIMEOUT = 600;
+const unsigned int SD_WRITE_TIMEOUT = 600;
 //------------------------------------------------------------------------------
 // card types
 /** Standard capacity V1 SD card */
@@ -141,7 +141,7 @@ class Sd2Card {
   uint8_t sendWriteCommand(uint32_t blockNumber, uint32_t eraseCount);
   void chipSelectHigh(void);
   void chipSelectLow(void);
-  uint8_t waitNotBusy(uint16_t timeoutMillis);
+  uint8_t waitNotBusy(unsigned int timeoutMillis);
   uint8_t writeData(uint8_t token, const uint8_t* src);
   uint8_t waitStartBlock(void);
   uint8_t setSckRate(uint8_t sckRateID);
