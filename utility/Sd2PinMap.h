@@ -21,7 +21,7 @@
 #ifndef Sd2PinMap_h
 #define Sd2PinMap_h
 
-#if defined(__arm__) || defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__)
+#if defined(__arm__) || defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)  || defined(__IMXRT1062__)
 
 #include <Arduino.h>
 
