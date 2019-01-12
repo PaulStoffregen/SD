@@ -149,7 +149,7 @@ static void spiSend(uint8_t b) {
  static void spiInit(uint8_t spiRate) {
   switch (spiRate) {
     // the top 2 speeds are set to 24 MHz, for the SD library defaults
-    case 0:  settings = SPISettings(25000000, MSBFIRST, SPI_MODE0); break;
+    case 0:  settings = SPISettings(25200000, MSBFIRST, SPI_MODE0); break;
     case 1:  settings = SPISettings(24000000, MSBFIRST, SPI_MODE0); break;
     case 2:  settings = SPISettings(8000000, MSBFIRST, SPI_MODE0); break;
     case 3:  settings = SPISettings(4000000, MSBFIRST, SPI_MODE0); break;
