@@ -9,7 +9,8 @@
 #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
 
 #include "kinetis.h"
-#include "core_pins.h" // testing only
+//#include "core_pins.h" // testing only
+//#include "HardwareSerial.h" // testing only
 
 // Missing in Teensyduino 1.30
 #ifndef MPU_CESR_VLD_MASK
@@ -28,6 +29,19 @@ enum {
         SDHC_RESULT_PARERR,             /* 4: Invalid Parameter */
         SDHC_RESULT_NO_RESPONSE         /* 5: No Response */ // from old diskio.h
 };
+
+/*void print_result(int n)
+{
+        switch (n) {
+        case SDHC_RESULT_OK: serial_print("OK\n"); break;
+        case SDHC_RESULT_ERROR: serial_print("R/W Error\n"); break;
+        case SDHC_RESULT_WRPRT: serial_print("Write Protect\n"); break;
+        case SDHC_RESULT_NOT_READY: serial_print("Not Ready\n"); break;
+        case SDHC_RESULT_PARERR: serial_print("Invalid Param\n"); break;
+        case SDHC_RESULT_NO_RESPONSE: serial_print("No Response\n"); break;
+        default: serial_print("Unknown result\n");
+        }
+}*/
 
 #define SDHC_STATUS_NOINIT              0x01    /* Drive not initialized */
 #define SDHC_STATUS_NODISK              0x02    /* No medium in the drive */
@@ -112,9 +126,13 @@ enum {
 // prescale can be 2, 4, 8, 16, 32, 64, 128, 256
 // divisor can be 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
 #define SDHC_SYSCTL_DIVISOR(prescale, divisor) \
-	(SDHC_SYSCTL_DVS((prescale)>>1)|SDHC_SYSCTL_SDCLKFS((divisor)-1))
+	(SDHC_SYSCTL_SDCLKFS((prescale)>>1)|SDHC_SYSCTL_DVS((divisor)-1))
 
-#if (F_CPU == 240000000)
+#if (F_CPU == 256000000)
+  #define SDHC_SYSCTL_400KHZ  SDHC_SYSCTL_DIVISOR(64, 10) // 400 kHz
+  #define SDHC_SYSCTL_25MHZ   SDHC_SYSCTL_DIVISOR(2, 6)   // 21.3 MHz
+  #define SDHC_SYSCTL_50MHZ   SDHC_SYSCTL_DIVISOR(2, 3)   // 42.6 MHz
+#elif (F_CPU == 240000000)
   #define SDHC_SYSCTL_400KHZ  SDHC_SYSCTL_DIVISOR(64, 10) // 375 kHz
   #define SDHC_SYSCTL_25MHZ   SDHC_SYSCTL_DIVISOR(2, 5)   // 24 MHz
   #define SDHC_SYSCTL_50MHZ   SDHC_SYSCTL_DIVISOR(2, 3)   // 40 MHz
@@ -214,6 +232,7 @@ static SD_CARD_DESCRIPTOR sdCardDesc;
 * Private functions
 ******************************************************************************/
 
+static uint8_t SDHC_Init(void);
 static void SDHC_InitGPIO(void);
 static void SDHC_ReleaseGPIO(void);
 static void SDHC_SetClock(uint32_t sysctl);
@@ -245,8 +264,10 @@ static int SDHC_ACMD41_SendOperationCond(uint32_t cond);
 
 // initialize the SDHC Controller
 // returns status of initialization(OK, nonInit, noCard, CardProtected)
-uint8_t SDHC_Init(void)
+static uint8_t SDHC_Init(void)
 {
+	int i;
+
 	// Enable clock to SDHC peripheral
 	SIM_SCGC3 |= SIM_SCGC3_SDHC;
 
@@ -256,7 +277,7 @@ uint8_t SDHC_Init(void)
 	SIM_SCGC6 |= SIM_SCGC6_DMAMUX;
 	SIM_SCGC7 |= SIM_SCGC7_DMA;
 
-	// Switch of MPU unit (maybe bug of silicon)
+	// Enable DMA access via MPU (not currently used)
 	MPU_CESR &= ~MPU_CESR_VLD_MASK;
 
 	// De-init GPIO - to prevent unwanted clocks on bus
@@ -290,9 +311,13 @@ uint8_t SDHC_Init(void)
 		SDHC_IRQSTATEN_BRRSEN | SDHC_IRQSTATEN_BWRSEN | SDHC_IRQSTATEN_DINTSEN |
 		SDHC_IRQSTATEN_CRMSEN | SDHC_IRQSTATEN_TCSEN | SDHC_IRQSTATEN_CCSEN;
 
-	/* 80 initial clocks */
-	SDHC_SYSCTL |= SDHC_SYSCTL_INITA;
-	while (SDHC_SYSCTL & SDHC_SYSCTL_INITA) { };
+	// initial clocks... SD spec says only 74 clocks are needed, but if Teensy rebooted
+	// while the card was in middle of an operation, thousands of clock cycles can be
+	// needed to get the card to complete a prior command and return to a usable state.
+	for (i=0; i < 500; i++) {
+		SDHC_SYSCTL |= SDHC_SYSCTL_INITA;
+		while (SDHC_SYSCTL & SDHC_SYSCTL_INITA) { };
+	}
 
 	// to do - check if this needed
 	SDHC_IRQSTAT |= SDHC_IRQSTAT_CRM;
@@ -339,17 +364,17 @@ uint8_t KinetisSDHC_InitCard(void)
   }
 
   resR = SDHC_CMD8_SetInterface(0x000001AA); // 3.3V and AA check pattern
-  if (resR > 0) {
-    sdCardDesc.status = SDHC_STATUS_NOINIT;
-    return SDHC_STATUS_NOINIT;
-  }
-
-  if (resR == 0) {
+  if (resR == SDHC_RESULT_OK) {
       if (SDHC_CMDRSP0 != 0x000001AA) {
         sdCardDesc.status = SDHC_STATUS_NOINIT;
         return SDHC_STATUS_NOINIT;
       }
       sdCardDesc.highCapacity = 1;
+  } else if (resR == SDHC_RESULT_NO_RESPONSE) {
+      // version 1 cards do not respond to CMD8
+  } else {
+    sdCardDesc.status = SDHC_STATUS_NOINIT;
+    return SDHC_STATUS_NOINIT;
   }
 
   if (SDHC_ACMD41_SendOperationCond(0)) {
@@ -540,13 +565,14 @@ static void SDHC_InitGPIO(void)
 // release the SDHC Controller signals
 static void SDHC_ReleaseGPIO(void)
 {
-  PORTE_PCR0 = 0;
-  PORTE_PCR1 = 0;
-  PORTE_PCR2 = 0;
-  PORTE_PCR3 = 0;
-  PORTE_PCR4 = 0;
-  PORTE_PCR5 = 0;
+  PORTE_PCR0 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.D1  */
+  PORTE_PCR1 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.D0  */
+  PORTE_PCR2 = 0;						/* SDHC.CLK */
+  PORTE_PCR3 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.CMD */
+  PORTE_PCR4 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS;	/* PULLUP SDHC.D3  */
+  PORTE_PCR5 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; 	/* PULLUP SDHC.D2  */
 }
+
 
 
 static void SDHC_SetClock(uint32_t sysctl)

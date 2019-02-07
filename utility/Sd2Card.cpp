@@ -143,8 +143,40 @@ static void spiSend(uint8_t b) {
 }
 /** SPI send multiple bytes */
 
+#elif defined(__IMXRT1052__)  || defined(__IMXRT1062__)
+ #define USE_TEENSY4_SPI
+ 
+ static void spiInit(uint8_t spiRate) {
+  switch (spiRate) {
+    // the top 2 speeds are set to 24 MHz, for the SD library defaults
+    case 0:  settings = SPISettings(25200000, MSBFIRST, SPI_MODE0); break;
+    case 1:  settings = SPISettings(24000000, MSBFIRST, SPI_MODE0); break;
+    case 2:  settings = SPISettings(8000000, MSBFIRST, SPI_MODE0); break;
+    case 3:  settings = SPISettings(4000000, MSBFIRST, SPI_MODE0); break;
+    case 4:  settings = SPISettings(3000000, MSBFIRST, SPI_MODE0); break;
+    case 5:  settings = SPISettings(2000000, MSBFIRST, SPI_MODE0); break;
+    default: settings = SPISettings(400000, MSBFIRST, SPI_MODE0);
+  }
+  SPI.begin();
+} 
 
-
+ static void spiSend(uint8_t b) {
+	SPI.transfer(b);
+ }
+ 
+ static  uint8_t spiRec(void) {
+	return SPI.transfer(0xff);
+ }
+ 
+ static void spiRec(uint8_t* buf, size_t len) {
+	SPI.transfer(buf, len);	
+ }
+ 
+ static void spiRecIgnore(size_t len) {
+	for (size_t i=0; i < len; i++) 
+		SPI.transfer(0xff);
+ }
+ 
 //------------------------------------------------------------------------------
 #else
 // functions for hardware SPI
@@ -224,16 +256,20 @@ uint8_t Sd2Card::SD_init(uint8_t sckRateID, uint8_t chipSelectPin) {
   type_ = 0;
   chipSelectPin_ = chipSelectPin;
   // 16-bit init start time allows over a minute
-  uint16_t t0 = (uint16_t)millis();
+  unsigned int t0 = millis();
   uint32_t arg;
 
   digitalWrite(chipSelectPin_, HIGH);
   pinMode(chipSelectPin_, OUTPUT);
   digitalWrite(chipSelectPin_, HIGH);
 
-#ifdef USE_TEENSY3_SPI
+#if defined(USE_TEENSY3_SPI)
   spiBegin();
   spiInit(6);
+#elif defined(USE_TEENSY4_SPI)
+  spiInit(6);
+  pinMode(SS_PIN, OUTPUT);
+  digitalWrite(SS_PIN, HIGH); // disable any SPI device using hardware SS pin  
 #else
   // set pin modes
   pinMode(SPI_MISO_PIN, INPUT);
@@ -250,7 +286,6 @@ uint8_t Sd2Card::SD_init(uint8_t sckRateID, uint8_t chipSelectPin) {
   settings = SPISettings(250000, MSBFIRST, SPI_MODE0);
 #endif
 #endif  // not USE_TEENSY3_SPI
-
   // must supply min of 74 clock cycles with CS high.
 #ifdef SPI_HAS_TRANSACTION
   SPI.beginTransaction(settings);
@@ -259,12 +294,11 @@ uint8_t Sd2Card::SD_init(uint8_t sckRateID, uint8_t chipSelectPin) {
 #ifdef SPI_HAS_TRANSACTION
   SPI.endTransaction();
 #endif
-
   chipSelectLow();
-
   // command to go idle in SPI mode
   while ((status_ = cardCommand(CMD0, 0)) != R1_IDLE_STATE) {
-    if (((uint16_t)(millis() - t0)) > SD_INIT_TIMEOUT) {
+    unsigned int d = millis() - t0;
+    if (d > SD_INIT_TIMEOUT) {
       goto fail; // SD_CARD_ERROR_CMD0
     }
   }
@@ -281,10 +315,10 @@ uint8_t Sd2Card::SD_init(uint8_t sckRateID, uint8_t chipSelectPin) {
   }
   // initialize card and send host supports SDHC if SD2
   arg = (type_ == SD_CARD_TYPE_SD2) ? 0X40000000 : 0;
-
   while ((status_ = cardAcmd(ACMD41, arg)) != R1_READY_STATE) {
     // check for timeout
-    if (((uint16_t)(millis() - t0)) > SD_INIT_TIMEOUT) {
+    unsigned int d = millis() - t0;
+    if (d > SD_INIT_TIMEOUT) {
       goto fail; // SD_CARD_ERROR_ACMD41
     }
   }
@@ -325,7 +359,7 @@ uint8_t Sd2Card::SD_readBlock(uint32_t block, uint8_t* dst)
   if (!waitStartBlock()) {
     goto fail;
   }
-#ifdef USE_TEENSY3_SPI
+#if defined(USE_TEENSY3_SPI) | defined(USE_TEENSY4_SPI)
   spiRec(dst, 512);
   spiRecIgnore(2);
 #else  // OPTIMIZE_HARDWARE_SPI
@@ -373,7 +407,7 @@ uint8_t Sd2Card::SD_readBlock(uint32_t block, uint8_t* dst)
  * false, is returned for an invalid value of \a sckRateID.
  */
 uint8_t Sd2Card::setSckRate(uint8_t sckRateID) {
-#ifdef USE_TEENSY3_SPI
+#if defined(USE_TEENSY3_SPI) || defined(USE_TEENSY4_SPI)
   spiInit(sckRateID);
   return true;
 #else
@@ -403,20 +437,23 @@ uint8_t Sd2Card::setSckRate(uint8_t sckRateID) {
 }
 //------------------------------------------------------------------------------
 // wait for card to go not busy
-uint8_t Sd2Card::waitNotBusy(uint16_t timeoutMillis) {
-  uint16_t t0 = millis();
+uint8_t Sd2Card::waitNotBusy(unsigned int timeoutMillis) {
+  unsigned int t0 = millis();
+  unsigned int d;
   do {
     if (spiRec() == 0XFF) return true;
+    d = millis() - t0;
   }
-  while (((uint16_t)millis() - t0) < timeoutMillis);
+  while (d < timeoutMillis);
   return false;
 }
 //------------------------------------------------------------------------------
 /** Wait for start block token */
 uint8_t Sd2Card::waitStartBlock(void) {
-  uint16_t t0 = millis();
+  unsigned int t0 = millis();
   while ((status_ = spiRec()) == 0XFF) {
-    if (((uint16_t)millis() - t0) > SD_READ_TIMEOUT) {
+    unsigned int d = millis() - t0;
+    if (d > SD_READ_TIMEOUT) {
       return false; // SD_CARD_ERROR_READ_TIMEOUT
     }
   }
@@ -468,7 +505,7 @@ uint8_t Sd2Card::SD_writeBlock(uint32_t blockNumber, const uint8_t* src) {
 //------------------------------------------------------------------------------
 // send one block of data for write block or write multiple blocks
 uint8_t Sd2Card::writeData(uint8_t token, const uint8_t* src) {
-#ifdef OPTIMIZE_HARDWARE_SPI
+#if defined(OPTIMIZE_HARDWARE_SPI) && !defined(USE_TEENSY4_SPI)
 
   // send data - optimized loop
   SPDR = token;
@@ -487,7 +524,7 @@ uint8_t Sd2Card::writeData(uint8_t token, const uint8_t* src) {
 #else  // OPTIMIZE_HARDWARE_SPI
   spiSend(token);
   for (uint16_t i = 0; i < 512; i++) {
-    spiSend(src[i]);
+    spiSend(src[i]); 
   }
 #endif  // OPTIMIZE_HARDWARE_SPI
   spiSend(0xff);  // dummy crc
