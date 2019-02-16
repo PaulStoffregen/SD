@@ -581,6 +581,10 @@ int SDHC_CardReadBlock(void * buff, uint32_t sector)
 {
   int result=0;
   uint32_t* pData = (uint32_t*)buff;
+  /* check alignment for DMA */
+  if (reinterpret_cast<uintptr_t>(static_cast<const void*>(buff)) % 4) {
+    return -1;
+  }
 //  Serial.print("Sector: "); Serial.println(sector); Serial.flush();
   // Check if this is ready
   if (sdCardDesc.status != 0) return SDHC_RESULT_NOT_READY;
@@ -640,6 +644,10 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
 {
   int result=0;
   const uint32_t *pData = (const uint32_t *)buff;
+  /* check alignment for DMA */
+  if (reinterpret_cast<uintptr_t>(static_cast<const void*>(buff)) % 4) {
+    return -1;
+  }
 
   // Check if this is ready
   if (sdCardDesc.status != 0) return SDHC_RESULT_NOT_READY;
