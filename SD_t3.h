@@ -31,6 +31,8 @@
 // currently read-only.  It CAN NOT WRITE ANYTHING TO YOUR SD CARD.  However,
 // it is *much* faster for reading more than 1 file at a time, especially for
 // the Teensy Audio Library to play and mix multiple sound files.
+// On Teensy 3.5 & 3.6, this optimization does NOT SUPPORT the built-in SD
+// sockets.  It only works with SD cards connected to the SPI pins.
 //
 //#define USE_TEENSY3_OPTIMIZED_CODE
 
