@@ -74,12 +74,9 @@ uint8_t const SD_CARD_TYPE_SD2 = 2;
 /** High Capacity SD card */
 uint8_t const SD_CARD_TYPE_SDHC = 3;
 //------------------------------------------------------------------------------
-#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)
+#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
 	#include "NXP_SDHC.h"
 	#define BUILTIN_SDCARD 254
-#elif defined(__IMXRT1062__)
-	#include "NXP_SDHC.h"
-	#define BUILTIN_SDCARD 36
 #endif
 //------------------------------------------------------------------------------
 /**
