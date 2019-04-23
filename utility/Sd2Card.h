@@ -77,6 +77,9 @@ uint8_t const SD_CARD_TYPE_SDHC = 3;
 #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)
 	#include "NXP_SDHC.h"
 	#define BUILTIN_SDCARD 254
+#elif defined(__IMXRT1062__)
+	#include "NXP_SDHC.h"
+	#define BUILTIN_SDCARD 36
 #endif
 //------------------------------------------------------------------------------
 /**
@@ -90,7 +93,7 @@ class Sd2Card {
   /* Initialize an SD flash memory card with the selected SPI clock rate
    * and the SD chip select pin.  */
   uint8_t init(uint8_t sckRateID, uint8_t chipSelectPin) {
-    #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)
+    #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
     if (chipSelectPin == BUILTIN_SDCARD) {
       chipSelectPin_ = BUILTIN_SDCARD;
       uint8_t ret = SDHC_CardInit();
@@ -104,7 +107,7 @@ class Sd2Card {
   uint8_t type(void) const {return type_;}
   /** Returns the current value, true or false, for partial block read. */
   uint8_t readBlock(uint32_t block, uint8_t* dst) {
-    #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)
+    #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
     if (chipSelectPin_ == BUILTIN_SDCARD) {
       return (SDHC_CardReadBlock(dst, block) == 0) ? true : false;
     }
@@ -113,7 +116,7 @@ class Sd2Card {
   }
   /** Return the card type: SD V1, SD V2 or SDHC */
   uint8_t writeBlock(uint32_t block, const uint8_t* src) {
-    #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)
+    #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
     if (chipSelectPin_ == BUILTIN_SDCARD) {
       return (SDHC_CardWriteBlock(src, block) == 0) ? true : false;
     }
