@@ -6,7 +6,7 @@
 //see also
 //https://community.nxp.com/thread/99202
 
-#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__)
+#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
 
 #include "core_pins.h"  // include calls to kinetis.h or imxrt.h
 #include "usb_serial.h" // for Serial
@@ -117,7 +117,7 @@ enum {
 #define SDHC_FIFO_BUFFER_SIZE               16
 #define SDHC_BLOCK_SIZE                     512
 
-#if defined(__IMXRT1052__)
+#if defined(__IMXRT1052__) || defined(__IMXRT1062__)
 #define MAKE_REG_MASK(m,s) (((uint32_t)(((uint32_t)(m) << s))))
 #define MAKE_REG_GET(x,m,s) (((uint32_t)(((uint32_t)(x)>>s) & m)))
 #define MAKE_REG_SET(x,m,s) (((uint32_t)(((uint32_t)(x) & m) << s)))
@@ -609,7 +609,7 @@ int SDHC_CardReadBlock(void * buff, uint32_t sector)
   sigen |= SDHC_IRQSIGEN_DMA_MASK ;
   
   SDHC_SYSCTL |= SDHC_SYSCTL_HCKEN;
-  #if defined(__IMXRT1052__)
+  #if defined(__IMXRT1052__) || defined(__IMXRT1062__)
     SDHC_MIX_CTRL |= SDHC_MIX_CTRL_DTDSEL ; // read
     SDHC_MIX_CTRL |=  SDHC_MIX_CTRL_DMAEN ; // DMA
   #endif
