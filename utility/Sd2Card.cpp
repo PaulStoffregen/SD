@@ -169,6 +169,7 @@ static void spiSend(uint8_t b) {
  }
  
  static void spiRec(uint8_t* buf, size_t len) {
+	memset(buf, 0xFF, len);
 	SPI.transfer(buf, len);	
  }
  
