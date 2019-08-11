@@ -37,7 +37,7 @@ SdFile root;
 // Wiz820+SD board: pin 4
 // Teensy 2.0: pin 0
 // Teensy++ 2.0: pin 20
-const int chipSelect = BUILTIN_SDCARD;    
+const int chipSelect = 4;
 
 void setup()
 {
@@ -64,7 +64,7 @@ void setup()
     Serial.println("* did you change the chipSelect pin to match your shield or module?");
     return;
   } else {
-   Serial.println("Wiring is correct and a card is present."); 
+   Serial.println("Wiring is correct and a card is present.");
   }
 
   // print the type of card
