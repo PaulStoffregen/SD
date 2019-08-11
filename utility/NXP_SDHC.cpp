@@ -6,17 +6,12 @@
 //see also
 //https://community.nxp.com/thread/99202
 
-#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1052__) || defined(__IMXRT1062__)
+#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 
 #include "core_pins.h"  // include calls to kinetis.h or imxrt.h
 #include "usb_serial.h" // for Serial
 
 #include "NXP_SDHC.h"
-
-// Missing in Teensyduino 1.30
-#ifndef MPU_CESR_VLD_MASK
-#define MPU_CESR_VLD_MASK         0x1u
-#endif
 
 /******************************************************************************
   Constants
@@ -117,7 +112,7 @@ enum {
 #define SDHC_FIFO_BUFFER_SIZE               16
 #define SDHC_BLOCK_SIZE                     512
 
-#if defined(__IMXRT1052__) || defined(__IMXRT1062__)
+#if defined(__IMXRT1062__)
 #define MAKE_REG_MASK(m,s) (((uint32_t)(((uint32_t)(m) << s))))
 #define MAKE_REG_GET(x,m,s) (((uint32_t)(((uint32_t)(x)>>s) & m)))
 #define MAKE_REG_SET(x,m,s) (((uint32_t)(((uint32_t)(x) & m) << s)))
@@ -294,6 +289,7 @@ enum {
 #define SDHC_WML_WRWML(n)     MAKE_REG_SET(n,0xFF,16) //(uint32_t)(((n) & 0x7F)<<16)  // Write Watermark Level
 #define SDHC_WML_RDWML(n)     MAKE_REG_SET(n,0xFF,0)  //(uint32_t)(((n) & 0x7F)<<0)   // Read Watermark Level
 
+// Teensy 4.0 only
 #define SDHC_MIX_CTRL_DMAEN     MAKE_REG_MASK(0x1,0)  //
 #define SDHC_MIX_CTRL_BCEN      MAKE_REG_MASK(0x1,1)  //
 #define SDHC_MIX_CTRL_AC12EN    MAKE_REG_MASK(0x1,2)  //
@@ -367,7 +363,7 @@ enum {
 #define SDHC_MMCBOOT      (USDHC1_MMC_BOOT) // MMC Boot register
 #define SDHC_VENDOR2    (USDHC2_VEND_SPEC2) // Vendor Specific2 register
 //
-#define IRQ_SDHC    IRQ_SDHC1
+//#define IRQ_SDHC    IRQ_SDHC1
 
 #define SDHC_MAX_DVS (0xF + 1U)
 #define SDHC_MAX_CLKFS (0xFF + 1U)
@@ -387,7 +383,7 @@ enum {
 #define IOMUXC_SW_PAD_CTL_PAD_DSE(n)    (((n)&0x7)<<3)
 #define IOMUXC_SW_PAD_CTL_PAD_DSE_MASK  ((0x7)<<3)
 
-#endif
+#endif // __IMXRT1062__
 
 #define SDHC_IRQSIGEN_DMA_MASK (SDHC_IRQSIGEN_TCIEN | SDHC_IRQSIGEN_DINTIEN | SDHC_IRQSIGEN_DMAEIEN)
 #define CARD_STATUS_READY_FOR_DATA  (1UL << 8)
@@ -425,7 +421,7 @@ static void sdhc_setSdclk(uint32_t kHzMax);
 static uint8_t SDHC_Init(void);
 static void SDHC_InitGPIO(void);
 static void SDHC_ReleaseGPIO(void);
-static void SDHC_SetClock(uint32_t sysctl);
+//static void SDHC_SetClock(uint32_t sysctl);
 static uint32_t SDHC_WaitStatus(uint32_t mask);
 static int SDHC_ReadBlock(uint32_t* pData);
 static int SDHC_WriteBlock(const uint32_t* pData);
@@ -473,21 +469,30 @@ uint8_t SDHC_CardInit(void)
   sdCardDesc.version2 = 0;
   sdCardDesc.numBlocks = 0;
 
-  if (resS)  return resS;
+  if (resS)
+    return resS;
+
   SDHC_IRQSIGEN = 0;
 
   resR = SDHC_CMD0_GoToIdle();
-  if (resR) { return sdCardDesc.status = SDHC_STATUS_NOINIT;}
-  
+  if (resR) {
+    sdCardDesc.status = SDHC_STATUS_NOINIT;
+    return SDHC_STATUS_NOINIT;
+  }
+
   resR = SDHC_CMD8_SetInterface(0x000001AA); // 3.3V and AA check pattern
-  if (resR == SDHC_RESULT_OK) 
-  { if (SDHC_CMDRSP0 != 0x000001AA) return sdCardDesc.status = SDHC_STATUS_NOINIT;
-    sdCardDesc.highCapacity = 1;
-  } 
-  else if (resR == SDHC_RESULT_NO_RESPONSE) 
-  { // version 1 cards do not respond to CMD8
-  } 
-  else return sdCardDesc.status = SDHC_STATUS_NOINIT;
+  if (resR == SDHC_RESULT_OK) {
+      if (SDHC_CMDRSP0 != 0x000001AA) {
+        sdCardDesc.status = SDHC_STATUS_NOINIT;
+        return SDHC_STATUS_NOINIT;
+      }
+      sdCardDesc.highCapacity = 1;
+  } else if (resR == SDHC_RESULT_NO_RESPONSE) {
+      // version 1 cards do not respond to CMD8
+  } else {
+    sdCardDesc.status = SDHC_STATUS_NOINIT;
+    return SDHC_STATUS_NOINIT;
+  }
 
   if (SDHC_ACMD41_SendOperationCond(0))  return sdCardDesc.status = SDHC_STATUS_NOINIT;
 
@@ -512,7 +517,7 @@ uint8_t SDHC_CardInit(void)
 
   // Card identify
   if (SDHC_CMD2_Identify())  return sdCardDesc.status = SDHC_STATUS_NOINIT;
-  
+
   // Get card address
   if (SDHC_CMD3_GetAddress())  return sdCardDesc.status = SDHC_STATUS_NOINIT;
 
@@ -550,7 +555,7 @@ uint8_t SDHC_CardInit(void)
   // Set Data bus width also in SDHC controller
   SDHC_PROCTL &= ~SDHC_PROCTL_DTW_MASK;
   SDHC_PROCTL |= SDHC_PROCTL_DTW(SDHC_PROCTL_DTW_4BIT);
-  
+
   // De-Init GPIO
   SDHC_ReleaseGPIO();
 
@@ -567,6 +572,7 @@ uint8_t SDHC_CardInit(void)
   return sdCardDesc.status;
 }
 
+
 //-----------------------------------------------------------------------------
 // FUNCTION:    SDHC_CardReadBlock (disk_read)
 // SCOPE:       SDHC public related function
@@ -577,6 +583,41 @@ uint8_t SDHC_CardInit(void)
 //
 // RETURNS:     result of operation
 //-----------------------------------------------------------------------------
+#if 1
+// read a block from disk, using polling
+//   buff - pointer on buffer where read data should be stored
+//   sector - index of start sector
+int SDHC_CardReadBlock(void * buff, uint32_t sector)
+{
+  int result;
+  uint32_t* pData = (uint32_t*)buff;
+
+  // Check if this is ready
+  if (sdCardDesc.status != 0)
+     return SDHC_RESULT_NOT_READY;
+
+  // Convert LBA to uint8_t address if needed
+  if (!sdCardDesc.highCapacity)
+    sector *= 512;
+
+  SDHC_IRQSTAT = 0xffff;
+#if defined(__IMXRT1062__)
+  SDHC_MIX_CTRL |= SDHC_MIX_CTRL_DTDSEL;
+#endif
+
+  // Just single block mode is needed
+  result = SDHC_CMD17_ReadBlock(sector);
+  if(result != SDHC_RESULT_OK) return result;
+  result = SDHC_ReadBlock(pData);
+
+  // finish up
+  while (!(SDHC_IRQSTAT & SDHC_IRQSTAT_TC)) { }  // wait for transfer to complete
+  SDHC_IRQSTAT = (SDHC_IRQSTAT_TC | SDHC_IRQSTAT_BRR | SDHC_IRQSTAT_AC12E);
+
+  return result;
+}
+#else
+// read a block from disk, using DMA & interrupts
 int SDHC_CardReadBlock(void * buff, uint32_t sector)
 {
   int result=0;
@@ -596,7 +637,7 @@ int SDHC_CardReadBlock(void * buff, uint32_t sector)
 
   // clear status
   SDHC_IRQSTAT = SDHC_IRQSTAT;
-  
+
   // use dma: disabling polling
   uint32_t irqstat = SDHC_IRQSTATEN;
   irqstat &= ~(SDHC_IRQSTATEN_BRRSEN | SDHC_IRQSTATEN_BWRSEN | SDHC_IRQSTATEN_CCSEN) ;
@@ -604,10 +645,10 @@ int SDHC_CardReadBlock(void * buff, uint32_t sector)
   // enable status
   irqstat |= SDHC_IRQSTATEN_DMAESEN | SDHC_IRQSTATEN_DINTSEN | SDHC_IRQSTATEN_TCSEN ;
   SDHC_IRQSTATEN = irqstat;
-  
+
   uint32_t sigen = SDHC_IRQSIGEN;
   sigen |= SDHC_IRQSIGEN_DMA_MASK ;
-  
+
   SDHC_SYSCTL |= SDHC_SYSCTL_HCKEN;
   #if defined(__IMXRT1052__) || defined(__IMXRT1062__)
     SDHC_MIX_CTRL |= SDHC_MIX_CTRL_DTDSEL ; // read
@@ -629,6 +670,7 @@ int SDHC_CardReadBlock(void * buff, uint32_t sector)
 
   return result;
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // FUNCTION:    SDHC_CardWriteBlock (disk_write)
@@ -640,6 +682,37 @@ int SDHC_CardReadBlock(void * buff, uint32_t sector)
 //
 // RETURNS:     result of operation
 //-----------------------------------------------------------------------------
+#if 1
+int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
+{
+  int result;
+  const uint32_t *pData = (const uint32_t *)buff;
+
+  // Check if this is ready
+  if (sdCardDesc.status != 0) return SDHC_RESULT_NOT_READY;
+
+  // Convert LBA to uint8_t address if needed
+  if(!sdCardDesc.highCapacity)
+    sector *= 512;
+
+  //SDHC_IRQSTAT = 0xffff;
+  SDHC_IRQSTAT = SDHC_IRQSTAT;
+#if defined(__IMXRT1062__)
+	SDHC_MIX_CTRL &= ~SDHC_MIX_CTRL_DTDSEL;
+#endif
+
+  // Just single block mode is needed
+  result = SDHC_CMD24_WriteBlock(sector);
+  if (result != SDHC_RESULT_OK) return result;
+  result = SDHC_WriteBlock(pData);
+
+  // finish up
+  while (!(SDHC_IRQSTAT & SDHC_IRQSTAT_TC)) { }  // wait for transfer to complete
+  SDHC_IRQSTAT = (SDHC_IRQSTAT_TC | SDHC_IRQSTAT_BWR | SDHC_IRQSTAT_AC12E);
+
+  return result;
+}
+#else
 int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
 {
   int result=0;
@@ -665,15 +738,15 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
   irqstat &= ~(SDHC_IRQSTATEN_BRRSEN | SDHC_IRQSTATEN_BWRSEN | SDHC_IRQSTATEN_CCSEN) ;
   irqstat &= ~(SDHC_IRQSTATEN_DCESEN | SDHC_IRQSTATEN_CCESEN) ;
   // enable status
-  irqstat |= /*SDHC_IRQSTATEN_DCESEN | SDHC_IRQSTATEN_CCESEN | */SDHC_IRQSTATEN_DMAESEN ; 
-  irqstat |= SDHC_IRQSTATEN_DINTSEN | SDHC_IRQSTATEN_TCSEN ; 
+  irqstat |= /*SDHC_IRQSTATEN_DCESEN | SDHC_IRQSTATEN_CCESEN | */SDHC_IRQSTATEN_DMAESEN ;
+  irqstat |= SDHC_IRQSTATEN_DINTSEN | SDHC_IRQSTATEN_TCSEN ;
   SDHC_IRQSTATEN = irqstat;
-  
+
   uint32_t sigen = SDHC_IRQSIGEN;
   sigen |= SDHC_IRQSIGEN_DMA_MASK ;
-  
+
   SDHC_SYSCTL |= SDHC_SYSCTL_HCKEN;
-  
+
   #if defined(__IMXRT1052__)
     SDHC_MIX_CTRL &= ~ SDHC_MIX_CTRL_DTDSEL;  // write
     SDHC_MIX_CTRL |=  SDHC_MIX_CTRL_DMAEN ;   //DMA
@@ -710,6 +783,7 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
 
   return result;
 }
+#endif
 
 /******************************************************************************
 
@@ -717,6 +791,7 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
 
 ******************************************************************************/
 #if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+  // Teensy 3.5 & 3.6
   // initialize the SDHC Controller signals
   static void SDHC_InitGPIO(void)
   {
@@ -727,7 +802,7 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
     PORTE_PCR4 = PORT_PCR_MUX(4) | PORT_PCR_PS | PORT_PCR_PE | PORT_PCR_DSE; /* SDHC.D3  */
     PORTE_PCR5 = PORT_PCR_MUX(4) | PORT_PCR_PS | PORT_PCR_PE | PORT_PCR_DSE; /* SDHC.D2  */
   }
-  
+
   // release the SDHC Controller signals
   static void SDHC_ReleaseGPIO(void)
   {
@@ -738,7 +813,7 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
     PORTE_PCR4 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS; /* PULLUP SDHC.D3  */
     PORTE_PCR5 = PORT_PCR_MUX(1) | PORT_PCR_PE | PORT_PCR_PS;   /* PULLUP SDHC.D2  */
   }
-  
+
   void initClock()
   {
   #ifdef HAS_KINETIS_MPU
@@ -748,16 +823,15 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
     // Enable SDHC clock.
     SIM_SCGC3 |= SIM_SCGC3_SDHC;
   }
-  
+
   uint32_t sdhcClock()
   { return F_CPU;
   }
 
 #else
-
+  // Teensy 4.0
   static void SDHC_InitGPIO(void)
   {
-    { 											//T4                      
       IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_04 = 0; //DAT2  
       IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_05 = 0; //DAT3  
       IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_00 = 0; //CMD   
@@ -780,7 +854,6 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
       IOMUXC_SW_PAD_CTL_PAD_GPIO_SD_B0_01 = CLOCK_MASK;
       IOMUXC_SW_PAD_CTL_PAD_GPIO_SD_B0_02 = DATA_MASK;
       IOMUXC_SW_PAD_CTL_PAD_GPIO_SD_B0_03 = DATA_MASK;
-    }
   }
   
   static void SDHC_ReleaseGPIO(void)
@@ -812,11 +885,11 @@ int SDHC_CardWriteBlock(const void * buff, uint32_t sector)
     CCM_CSCDR1 |= CCM_CSCDR1_USDHC1_CLK_PODF((7)); // &0x7
   
     // for testing
-    CCM_CCOSR = CCM_CCOSR_CLKO1_EN | CCM_CCOSR_CLKO1_DIV(7) | CCM_CCOSR_CLKO1_SEL(1); //(1: SYS_PLL/2)
-    IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_04 = 6; //CCM_CLKO1 (0 is USDHC1_DAT2)
+    //CCM_CCOSR = CCM_CCOSR_CLKO1_EN | CCM_CCOSR_CLKO1_DIV(7) | CCM_CCOSR_CLKO1_SEL(1); //(1: SYS_PLL/2)
+    //IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_04 = 6; //CCM_CLKO1 (0 is USDHC1_DAT2)
     // for testing
-    CCM_CCOSR |= (CCM_CCOSR_CLKO2_EN | CCM_CCOSR_CLKO2_DIV(7) | CCM_CCOSR_CLKO2_SEL(3)); //(3: usdhc1_clk_root))
-    IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_05 = 6; //CCM_CLKO2 (0 is USDHC1_DAT3)
+    //CCM_CCOSR |= (CCM_CCOSR_CLKO2_EN | CCM_CCOSR_CLKO2_DIV(7) | CCM_CCOSR_CLKO2_SEL(3)); //(3: usdhc1_clk_root))
+    //IOMUXC_SW_MUX_CTL_PAD_GPIO_SD_B0_05 = 6; //CCM_CLKO2 (0 is USDHC1_DAT3)
   }
   
   uint32_t sdhcClock()
@@ -878,7 +951,7 @@ static void sdhc_setSdclk(uint32_t kHzMax) {
   while ((f_pll / (sdclkfs * dvs) > maxSdclk) && (dvs < DVS_LIMIT)) {
     dvs++;
   }
-  uint32_t m_sdClkKhz = f_pll / (1000 * sdclkfs * dvs);
+  //uint32_t m_sdClkKhz = f_pll / (1000 * sdclkfs * dvs);
 
   sdclkfs >>= 1;
   dvs--;
@@ -906,7 +979,7 @@ static void sdhc_setSdclk(uint32_t kHzMax) {
 //  Serial.printf("setSdclk: %d %d : %x %x\n\r", f_pll, m_sdClkKhz, sdclkfs, dvs);
 }
 
-
+#if 0
 void sdhc_isr(void)
 { SDHC_IRQSIGEN &= ~SDHC_IRQSIGEN_DMA_MASK;
   //
@@ -922,20 +995,21 @@ void sdhc_isr(void)
 
   dmaDone=1;
 }
+#endif
 
 // initialize the SDHC Controller
 // returns status of initialization(OK, nonInit, noCard, CardProtected)
 static uint8_t SDHC_Init(void)
 {
   initClock();
-  
+
   // De-init GPIO - to prevent unwanted clocks on bus
   SDHC_ReleaseGPIO();
 
-  #if defined (__IMXRT1052__)
-    SDHC_SYSCTL   |= 0xF;
-    SDHC_MIX_CTRL |= 0x80000000;
-  #endif  
+  #if defined (__IMXRT1062__)
+    //SDHC_SYSCTL   |= 0xF;
+    SDHC_MIX_CTRL = 0x80000000;
+  #endif
 
   /* Reset SDHC */
   SDHC_SYSCTL |= SDHC_SYSCTL_RSTA | SDHC_SYSCTL_SDCLKFS(0x80);
@@ -952,32 +1026,41 @@ static uint8_t SDHC_Init(void)
 
   /* Initial values */ // to do - Check values
   SDHC_BLKATTR = SDHC_BLKATTR_BLKCNT(1) | SDHC_BLKATTR_BLKSIZE(512);
-  SDHC_PROCTL &= ~SDHC_PROCTL_DMAS(3); // clear ADMA
+  //SDHC_PROCTL &= ~SDHC_PROCTL_DMAS(3); // clear ADMA
+  //SDHC_PROCTL |=  SDHC_PROCTL_D3CD;
+  //SDHC_PROCTL = SDHC_PROCTL_EMODE(SDHC_PROCTL_EMODE_INVARIANT) | SDHC_PROCTL_D3CD;
+  SDHC_PROCTL = SDHC_PROCTL & ~(SDHC_PROCTL_EMODE(3))
+	| (SDHC_PROCTL_EMODE(SDHC_PROCTL_EMODE_INVARIANT) | SDHC_PROCTL_D3CD );
+  //SDHC_WML = SDHC_WML_RDWML(SDHC_FIFO_BUFFER_SIZE) | SDHC_WML_WRWML(SDHC_FIFO_BUFFER_SIZE);
+  //Serial.printf("SDHC_WML = %08X\n", SDHC_WML); // prints 08100810 (good)
+  //#if defined(__IMXRT1062__)
+    //SDHC_VENDOR = 0x2000F801; // (1<<29 | 0x1F<<11 | 1);
+    //SDHC_VENDOR2 &= ~(1<<12); //switch off ACMD23 sharing SDMA
+  //#endif
 
-  SDHC_PROCTL |=  SDHC_PROCTL_D3CD;
-  // SDHC_PROCTL = SDHC_PROCTL_EMODE(SDHC_PROCTL_EMODE_INVARIANT) | SDHC_PROCTL_D3CD;
-  // SDHC_WML |= SDHC_WML_RDWML(SDHC_FIFO_BUFFER_SIZE) | SDHC_WML_WRWML(SDHC_FIFO_BUFFER_SIZE);
-
-  #if defined(__IMXRT1052__)
-    SDHC_VENDOR = 0x2000F801; // (1<<29 | 0x1F<<11 | 1);
-    SDHC_VENDOR2 &= ~(1<<12); //switch off ACMD23 sharing SDMA
-  #endif
-  
   /* Enable requests */
   // clear interrupt status
   SDHC_IRQSTAT = SDHC_IRQSTAT;
 
-  SDHC_IRQSTATEN =  //SDHC_IRQSTAT_CRM | SDHC_IRQSTATEN_CIESEN | 
+#if 1
+  SDHC_IRQSTATEN = SDHC_IRQSTATEN_DMAESEN | SDHC_IRQSTATEN_AC12ESEN | SDHC_IRQSTATEN_DEBESEN |
+	SDHC_IRQSTATEN_DCESEN | SDHC_IRQSTATEN_DTOESEN | SDHC_IRQSTATEN_CIESEN |
+	SDHC_IRQSTATEN_CEBESEN | SDHC_IRQSTATEN_CCESEN | SDHC_IRQSTATEN_CTOESEN |
+	SDHC_IRQSTATEN_BRRSEN | SDHC_IRQSTATEN_BWRSEN | SDHC_IRQSTATEN_DINTSEN |
+	SDHC_IRQSTATEN_CRMSEN | SDHC_IRQSTATEN_TCSEN | SDHC_IRQSTATEN_CCSEN;
+#else
+  SDHC_IRQSTATEN =  //SDHC_IRQSTAT_CRM | SDHC_IRQSTATEN_CIESEN |
                     SDHC_IRQSTATEN_TCSEN | SDHC_IRQSTATEN_CCSEN;
 
   attachInterruptVector(IRQ_SDHC, sdhc_isr);
   NVIC_SET_PRIORITY(IRQ_SDHC, 6 * 16);
   NVIC_ENABLE_IRQ(IRQ_SDHC);
+#endif
 
   // initial clocks... SD spec says only 74 clocks are needed, but if Teensy rebooted
   // while the card was in middle of an operation, thousands of clock cycles can be
   // needed to get the card to complete a prior command and return to a usable state.
-  for (int ii = 0; ii < 500; ii++) {
+  for (int ii = 0; ii < 1500; ii++) {
     SDHC_SYSCTL |= SDHC_SYSCTL_INITA;
     while (SDHC_SYSCTL & SDHC_SYSCTL_INITA) ;
   }
@@ -1011,7 +1094,71 @@ static uint32_t SDHC_WaitStatus(uint32_t mask)
   return 0;
 }
 
-//-----------------------------------------------------------------------------------
+// reads one block
+static int SDHC_ReadBlock(uint32_t* pData)
+{
+	uint32_t i, irqstat;
+	const uint32_t i_max = ((SDHC_BLOCK_SIZE) / (4 * SDHC_FIFO_BUFFER_SIZE));
+
+	for (i = 0; i < i_max; i++) {
+		irqstat = SDHC_IRQSTAT;
+		SDHC_IRQSTAT = irqstat | SDHC_IRQSTAT_BRR;
+		if (irqstat & (SDHC_IRQSTAT_DEBE | SDHC_IRQSTAT_DCE | SDHC_IRQSTAT_DTOE)) {
+			SDHC_IRQSTAT = irqstat | SDHC_IRQSTAT_BRR |
+				SDHC_IRQSTAT_DEBE | SDHC_IRQSTAT_DCE | SDHC_IRQSTAT_DTOE;
+			SDHC_CMD12_StopTransferWaitForBusy();
+			return SDHC_RESULT_ERROR;
+		}
+		while (!(SDHC_PRSSTAT & SDHC_PRSSTAT_BREN)) { };
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+		*pData++ = SDHC_DATPORT;
+	}
+	return SDHC_RESULT_OK;
+}
+
+// writes one block
+static int SDHC_WriteBlock(const uint32_t* pData)
+{
+	uint32_t i, i_max, j;
+	i_max = ((SDHC_BLOCK_SIZE) / (4 * SDHC_FIFO_BUFFER_SIZE));
+
+	for(i = 0; i < i_max; i++) {
+		while (!(SDHC_IRQSTAT & SDHC_IRQSTAT_BWR)) ; // wait
+		if (SDHC_IRQSTAT & (SDHC_IRQSTAT_DEBE | SDHC_IRQSTAT_DCE | SDHC_IRQSTAT_DTOE)) {
+			SDHC_IRQSTAT |= SDHC_IRQSTAT_DEBE | SDHC_IRQSTAT_DCE |
+				SDHC_IRQSTAT_DTOE | SDHC_IRQSTAT_BWR;
+			(void)SDHC_CMD12_StopTransferWaitForBusy();
+			return SDHC_RESULT_ERROR;
+		}
+		for(j=0; j<SDHC_FIFO_BUFFER_SIZE; j++) {
+			SDHC_DATPORT = *pData++;
+		}
+		SDHC_IRQSTAT |= SDHC_IRQSTAT_BWR;
+
+		if (SDHC_IRQSTAT & (SDHC_IRQSTAT_DEBE | SDHC_IRQSTAT_DCE | SDHC_IRQSTAT_DTOE)) {
+			SDHC_IRQSTAT |= SDHC_IRQSTAT_DEBE | SDHC_IRQSTAT_DCE |
+				SDHC_IRQSTAT_DTOE | SDHC_IRQSTAT_BWR;
+			(void)SDHC_CMD12_StopTransferWaitForBusy();
+			return SDHC_RESULT_ERROR;
+		}
+	}
+	return SDHC_RESULT_OK;
+}
+
 // sends the command to SDcard
 static int SDHC_CMD_Do(uint32_t xfertyp)
 {
@@ -1024,20 +1171,21 @@ static int SDHC_CMD_Do(uint32_t xfertyp)
 
   /* Wait for response */
   const uint32_t mask = SDHC_IRQSTAT_CIE | SDHC_IRQSTAT_CEBE | SDHC_IRQSTAT_CCE | SDHC_IRQSTAT_CC;
-  if (SDHC_WaitStatus(mask) != SDHC_IRQSTAT_CC)
-  { SDHC_IRQSTAT |= mask;
-    return SDHC_RESULT_ERROR;
+  if (SDHC_WaitStatus(mask) != SDHC_IRQSTAT_CC) {
+      //SDHC_IRQSTAT |= mask;
+      SDHC_IRQSTAT |= (mask | SDHC_IRQSTAT_CTOE);
+      return SDHC_RESULT_ERROR;
   }
   /* Check card removal */
   if (SDHC_IRQSTAT & SDHC_IRQSTAT_CRM) {
       SDHC_IRQSTAT |= SDHC_IRQSTAT_CTOE | SDHC_IRQSTAT_CC;
       return SDHC_RESULT_NOT_READY;
   }
-  
+
   /* Get response, if available */
-  if (SDHC_IRQSTAT & SDHC_IRQSTAT_CTOE)
-  { SDHC_IRQSTAT |= SDHC_IRQSTAT_CTOE | SDHC_IRQSTAT_CC;
-    return SDHC_RESULT_NO_RESPONSE;
+  if (SDHC_IRQSTAT & SDHC_IRQSTAT_CTOE) {
+      SDHC_IRQSTAT |= SDHC_IRQSTAT_CTOE | SDHC_IRQSTAT_CC;
+      return SDHC_RESULT_NO_RESPONSE;
   }
   SDHC_IRQSTAT |= SDHC_IRQSTAT_CC;
 
@@ -1068,7 +1216,7 @@ static int SDHC_CMD2_Identify(void)
 
   SDHC_CMDARG = 0;
 
-  xfertyp = (SDHC_XFERTYP_CMDINX(SDHC_CMD2) | SDHC_XFERTYP_CCCEN 
+  xfertyp = (SDHC_XFERTYP_CMDINX(SDHC_CMD2) | SDHC_XFERTYP_CCCEN
             | SDHC_XFERTYP_RSPTYP(SDHC_XFERTYP_RSPTYP_136));
 
   result = SDHC_CMD_Do(xfertyp);
@@ -1201,7 +1349,7 @@ static int SDHC_CMD12_StopTransferWaitForBusy(void)
     result = SDHC_CMD12_StopTransfer();
     timeOut--;
   } while (timeOut && (SDHC_PRSSTAT & SDHC_PRSSTAT_DLA) && result == SDHC_RESULT_OK);
-  
+
   if (result != SDHC_RESULT_OK)  return result;
   if (!timeOut)  return SDHC_RESULT_NO_RESPONSE;
 
