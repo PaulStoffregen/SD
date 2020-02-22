@@ -48,7 +48,7 @@ void setup()
  // Open serial communications and wait for port to open:
   Serial.begin(9600);
    while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
+    ; // wait for serial port to connect.
   }
 
 
@@ -77,8 +77,7 @@ void loop()
     }
   }
 
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
+  // open the file.
   File dataFile = SD.open("datalog.txt", FILE_WRITE);
 
   // if the file is available, write to it:
