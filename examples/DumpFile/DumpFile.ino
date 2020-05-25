@@ -33,7 +33,7 @@
 // Adafruit SD shields and modules: pin 10
 // Sparkfun SD shield: pin 8
 // Teensy audio board: pin 10
-// Teensy 3.5 & 3.6 on-board: BUILTIN_SDCARD
+// Teensy 3.5 & 3.6 & 4.1 on-board: BUILTIN_SDCARD
 // Wiz820+SD board: pin 4
 // Teensy 2.0: pin 0
 // Teensy++ 2.0: pin 20
