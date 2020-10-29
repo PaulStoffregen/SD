@@ -1,75 +1,57 @@
-#if defined(__arm__)
-#include "SD_t3.h"
-#endif
-/*
-
- SD - a slightly more friendly wrapper for sdfatlib
-
- This library aims to expose a subset of SD card functionality
- in the form of a higher level "wrapper" object.
-
- License: GNU General Public License V3
-          (Because sdfatlib is licensed with this.)
-
- (C) Copyright 2010 SparkFun Electronics
-
- */
-
 #ifndef __SD_H__
 #define __SD_H__
 
 #include <Arduino.h>
+#include <FS.h>
 
-#include <utility/SdFat.h>
-#include <utility/SdFatUtil.h>
+class Sd2Card;
+class SdVolume;
+class SdFile;
 
-#define FILE_READ O_READ
-#define FILE_WRITE (O_READ | O_WRITE | O_CREAT)
-
-class File : public Stream {
- private:
-  char _name[13]; // our name
-  SdFile *_file;  // underlying file pointer
-
+class SD_File : public File {
 public:
-  File(SdFile f, const char *name);     // wraps an underlying SdFile
-  File(void);      // 'empty' constructor
-  ~File(void);     // destructor
+  SD_File(const SdFile &f, const char *name);
+  SD_File(void);
+  virtual ~SD_File(void);
   virtual size_t write(uint8_t);
-  virtual size_t write(const uint8_t *buf, size_t size);
+  virtual size_t write(const void *buf, size_t size);
   virtual int read();
   virtual int peek();
   virtual int available();
   virtual void flush();
-  int read(void *buf, uint16_t nbyte);
-  boolean seek(uint32_t pos);
-  uint32_t position();
-  uint32_t size();
-  void close();
-  operator bool();
-  char * name();
-
-  boolean isDirectory(void);
-  File openNextFile(uint8_t mode = O_RDONLY);
-  void rewindDirectory(void);
-  
+  virtual size_t read(void *buf, size_t nbyte);
+  virtual bool seek(uint32_t pos, int mode = 0);
+  virtual uint32_t position() const;
+  virtual uint32_t size() const;
+  virtual void close();
+  virtual operator bool() const;
+  virtual const char * name();
+  virtual boolean isDirectory(void);
+  virtual File openNextFile(uint8_t mode = 0 /*O_RDONLY*/) override;
+  virtual void rewindDirectory(void);
+  virtual void whoami();
   using Print::write;
+private:
+  char _name[13]; // our name
+  SdFile *_file;  // underlying file pointer
 };
 
-class SDClass {
+
+
+class SDClass : public FS {
 
 private:
   // These are required for initialisation and use of sdfatlib
-  Sd2Card card;
-  SdVolume volume;
-  SdFile root;
+  Sd2Card *card;
+  SdVolume *volume;
+  SdFile *root;
   
   // my quick&dirty iterator, should be replaced
   SdFile getParentDir(const char *filepath, int *indx);
 public:
   // This needs to be called to set up the connection to the SD card
   // before other methods are used.
-  boolean begin(uint8_t csPin = SD_CHIP_SELECT_PIN);
+  bool begin(uint8_t csPin = 10 /*SD_CHIP_SELECT_PIN*/);
   
   // Open the specified file/directory with the supplied mode (e.g. read or
   // write, etc). Returns a File object for interacting with the file.
@@ -77,16 +59,16 @@ public:
   File open(const char *filename, uint8_t mode = FILE_READ);
 
   // Methods to determine if the requested file path exists.
-  boolean exists(const char *filepath);
+  bool exists(const char *filepath);
 
   // Create the requested directory heirarchy--if intermediate directories
   // do not exist they will be created.
-  boolean mkdir(const char *filepath);
+  bool mkdir(const char *filepath);
   
   // Delete the file.
-  boolean remove(const char *filepath);
+  bool remove(const char *filepath);
   
-  boolean rmdir(const char *filepath);
+  bool rmdir(const char *filepath);
 
 private:
 
@@ -97,7 +79,7 @@ private:
   // It shouldn't be set directly--it is set via the parameters to `open`.
   int fileOpenMode;
   
-  friend class File;
+  friend class SD_File;
   friend boolean callback_openPath(SdFile&, char *, boolean, void *); 
 };
 

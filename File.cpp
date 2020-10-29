@@ -1,151 +1,140 @@
-/*
 
- SD - a slightly more friendly wrapper for sdfatlib
-
- This library aims to expose a subset of SD card functionality
- in the form of a higher level "wrapper" object.
-
- License: GNU General Public License V3
-          (Because sdfatlib is licensed with this.)
-
- (C) Copyright 2010 SparkFun Electronics
-
- */
-
+#include <Arduino.h>
 #include <SD.h>
+#include <limits.h>
+
 #ifndef __SD_t3_H__
 
-/* for debugging file open/close leaks
-   uint8_t nfilecount=0;
-*/
+#include <utility/SdFat.h>
+#include <utility/SdFatUtil.h>
 
-File::File(SdFile f, const char *n) {
-  // oh man you are kidding me, new() doesnt exist? Ok we do it by hand!
-  _file = (SdFile *)malloc(sizeof(SdFile)); 
-  if (_file) {
-    memcpy(_file, &f, sizeof(SdFile));
-    
-    strncpy(_name, n, 12);
-    _name[12] = 0;
-    
-    /* for debugging file open/close leaks
-       nfilecount++;
-       Serial.print("Created \"");
-       Serial.print(n);
-       Serial.print("\": ");
-       Serial.println(nfilecount, DEC);
-    */
-  }
+
+void SD_File::whoami()
+{
+	//Serial.printf("  SD_File this=%x, f=%x\n", (int)this, (int)f.get());
+	Serial.printf("  SD_File this=%x, refcount=%u\n",
+		(int)this, getRefcount());
+	static int whoamicount = 0;
+	if (++whoamicount > 20) while (1) ;
 }
 
-File::File(void) {
-  _file = 0;
-  _name[0] = 0;
-  //Serial.print("Created empty file object");
+
+SD_File::SD_File(const SdFile &file, const char *n)
+{
+	_file = new SdFile();
+	memcpy(_file, &file, sizeof(SdFile)); // should use a copy constructor?
+	strncpy(_name, n, 12);
+	_name[12] = 0;
+	//f = (File *)this;
 }
 
-File::~File(void) {
-  //  Serial.print("Deleted file object");
+SD_File::SD_File(void)
+{
+	_file = nullptr;
+	_name[0] = 0;
+	//f = (File *)this;
+}
+
+SD_File::~SD_File(void)
+{
+	close();
 }
 
 // returns a pointer to the file name
-char *File::name(void) {
-  return _name;
+const char * SD_File::name(void) {
+	return _name;
 }
 
 // a directory is a special type of file
-boolean File::isDirectory(void) {
-  return (_file && _file->isDir());
+bool SD_File::isDirectory(void)
+{
+	return (_file && _file->isDir());
 }
 
 
-size_t File::write(uint8_t val) {
-  return write(&val, 1);
+size_t SD_File::write(uint8_t val)
+{
+	return write(&val, 1);
 }
 
-size_t File::write(const uint8_t *buf, size_t size) {
-  size_t t;
-  if (!_file) {
-    setWriteError();
-    return 0;
-  }
-  _file->clearWriteError();
-  t = _file->write(buf, size);
-  if (_file->getWriteError()) {
-    setWriteError();
-    return 0;
-  }
-  return t;
+size_t SD_File::write(const void *buf, size_t size)
+{
+	if (_file == nullptr) {
+		setWriteError();
+		return 0;
+	}
+	_file->clearWriteError();
+	size_t t = _file->write(buf, size);
+	if (_file->getWriteError()) {
+		setWriteError();
+		return 0;
+	}
+	return t;
 }
 
-int File::peek() {
-  if (! _file) 
-    return 0;
-
-  int c = _file->read();
-  if (c != -1) _file->seekCur(-1);
-  return c;
+int SD_File::peek()
+{
+	if (_file == nullptr) return 0;
+	int c = _file->read();
+	if (c != -1) _file->seekCur(-1);
+	return c;
 }
 
-int File::read() {
-  if (_file) 
-    return _file->read();
-  return -1;
+int SD_File::read()
+{
+	if (_file == nullptr) return -1;
+	return _file->read();
 }
 
 // buffered read for more efficient, high speed reading
-int File::read(void *buf, uint16_t nbyte) {
-  if (_file) 
-    return _file->read(buf, nbyte);
-  return 0;
+size_t SD_File::read(void *buf, size_t nbyte) {
+	if (_file == nullptr) return 0;
+	return _file->read(buf, nbyte);
 }
 
-int File::available() {
-  if (! _file) return 0;
-
-  uint32_t n = size() - position();
-
-  return n > 0X7FFF ? 0X7FFF : n;
+int SD_File::available()
+{
+	if (_file == nullptr) return 0;
+	uint32_t n = size() - position();
+	if (n > INT_MAX) n = INT_MAX;
+	return n;
 }
 
-void File::flush() {
-  if (_file)
-    _file->sync();
+void SD_File::flush()
+{
+	if (_file == nullptr) return;
+	_file->sync();
 }
 
-boolean File::seek(uint32_t pos) {
-  if (! _file) return false;
-
-  return _file->seekSet(pos);
+bool SD_File::seek(uint32_t pos, int mode)
+{
+	if (_file == nullptr) return false;
+	return _file->seekSet(pos);
 }
 
-uint32_t File::position() {
-  if (! _file) return -1;
-  return _file->curPosition();
+uint32_t SD_File::position() const
+{
+	if (_file == nullptr) return 0;
+	return _file->curPosition();
 }
 
-uint32_t File::size() {
-  if (! _file) return 0;
-  return _file->fileSize();
+uint32_t SD_File::size() const
+{
+	if (_file == nullptr) return 0;
+	return _file->fileSize();
 }
 
-void File::close() {
-  if (_file) {
-    _file->close();
-    free(_file); 
-    _file = 0;
-
-    /* for debugging file open/close leaks
-    nfilecount--;
-    Serial.print("Deleted ");
-    Serial.println(nfilecount, DEC);
-    */
-  }
+void SD_File::close()
+{
+	if (_file == nullptr) return;
+	_file->close();
+	//delete _file; // TODO: how to handle this?
+	_file = nullptr;
 }
 
-File::operator bool() {
-  if (_file) 
-    return  _file->isOpen();
-  return false;
+SD_File::operator bool() const
+{
+	if (_file == nullptr) return false;
+	return _file->isOpen();
 }
 #endif
