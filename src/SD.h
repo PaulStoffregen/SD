@@ -5,6 +5,10 @@
 #include <FS.h>
 #include <SdFat.h>
 
+#if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
+#define BUILTIN_SDCARD 254
+#endif
+
 class SDFile : public File
 {
 public:
@@ -92,6 +96,12 @@ class SDClass : public FS
 public:
 	SDClass() { }
 	bool begin(uint8_t csPin = 10) {
+#ifdef BUILTIN_SDCARD
+		if (csPin == BUILTIN_SDCARD) {
+			return sdfs.begin(SdioConfig(FIFO_SDIO));
+			//return sdfs.begin(SdioConfig(DMA_SDIO));
+		}
+#endif
 		return sdfs.begin(csPin, SD_SCK_MHZ(24));
 	}
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
