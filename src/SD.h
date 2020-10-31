@@ -108,8 +108,11 @@ public:
 		oflag_t flags = O_READ;
 		if (mode == FILE_WRITE) flags = O_READ | O_WRITE | O_CREAT;
 		FsFile file = sdfs.open(filepath, flags);
-		// TODO: Arduino's default to seek to end of writable file
-		if (file) return File(new SDFile(file));
+		if (file) {
+			// Arduino's default FILE_WRITE starts at end of file
+			if (mode == FILE_WRITE) file.seekEnd(0);
+			return File(new SDFile(file));
+		}
 		return File();
 	}
 	bool exists(const char *filepath) {
