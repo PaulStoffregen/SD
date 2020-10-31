@@ -133,4 +133,36 @@ public: // allow access, so users can mix SD & SdFat APIs
 
 extern SDClass SD;
 
+
+
+#define SD_CARD_TYPE_SD1 0
+#define SD_CARD_TYPE_SD2 1
+#define SD_CARD_TYPE_SDHC 3
+class Sd2Card
+{
+public:
+	bool init(uint8_t speed, uint8_t csPin) {
+		return SD.sdfs.begin(csPin);
+	}
+	uint8_t type() {
+		return SD.sdfs.card()->type();
+	}
+};
+class SdVolume
+{
+public:
+	bool init(Sd2Card &card) {
+		return SD.sdfs.vol() != nullptr;
+	}
+	uint8_t fatType() {
+		return SD.sdfs.vol()->fatType();
+	}
+	uint32_t blocksPerCluster() {
+		return SD.sdfs.vol()->sectorsPerCluster();
+	}
+	uint32_t clusterCount() {
+		return SD.sdfs.vol()->clusterCount();
+	}
+};
+
 #endif
