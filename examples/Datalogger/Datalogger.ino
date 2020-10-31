@@ -1,7 +1,7 @@
 /*
   SD card datalogger
  
- This example shows how to log data from three analog sensors 
+ This example shows how to log data from three analog sensors
  to an SD card using the SD library.
  	
  The circuit:
@@ -17,7 +17,6 @@
  by Tom Igoe
  
  This example code is in the public domain.
- 	 
  */
 
 #include <SD.h>
@@ -44,21 +43,22 @@ void setup()
   //UNCOMMENT THESE TWO LINES FOR TEENSY AUDIO BOARD:
   //SPI.setMOSI(7);  // Audio shield has MOSI on pin 7
   //SPI.setSCK(14);  // Audio shield has SCK on pin 14
-  
- // Open serial communications and wait for port to open:
+
+  // Open serial communications and wait for port to open:
   Serial.begin(9600);
-   while (!Serial) {
+  while (!Serial) {
     ; // wait for serial port to connect.
   }
 
 
   Serial.print("Initializing SD card...");
-  
+
   // see if the card is present and can be initialized:
   if (!SD.begin(chipSelect)) {
     Serial.println("Card failed, or not present");
-    // don't do anything more:
-    return;
+    while (1) {
+      // No SD card, so don't do anything more - stay stuck here
+    }
   }
   Serial.println("card initialized.");
 }
@@ -73,7 +73,7 @@ void loop()
     int sensor = analogRead(analogPin);
     dataString += String(sensor);
     if (analogPin < 2) {
-      dataString += ","; 
+      dataString += ",";
     }
   }
 
@@ -86,16 +86,12 @@ void loop()
     dataFile.close();
     // print to the serial port too:
     Serial.println(dataString);
-  }  
-  // if the file isn't open, pop up an error:
-  else {
+  } else {
+    // if the file isn't open, pop up an error:
     Serial.println("error opening datalog.txt");
-  } 
+  }
+  delay(100); // run at a reasonable not-too-fast speed
 }
-
-
-
-
 
 
 
