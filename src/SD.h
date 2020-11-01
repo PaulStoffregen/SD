@@ -9,10 +9,22 @@
 #define BUILTIN_SDCARD 254
 #endif
 
+#if defined(__arm__)
+  // Support everything on 32 bit boards with enough memory
+  #define SDFAT_FILE FsFile
+  #define SDFAT_BASE SdFs
+  #define MAX_FILENAME_LEN 256
+#elif defined(__AVR__)
+  // Limit to 32GB cards on 8 bit Teensy with only limited memory
+  #define SDFAT_FILE File32
+  #define SDFAT_BASE SdFat32
+  #define MAX_FILENAME_LEN 64
+#endif
+
 class SDFile : public File
 {
 public:
-	SDFile(const FsFile &file) : sdfatfile(file), filename(nullptr) { }
+	SDFile(const SDFAT_FILE &file) : sdfatfile(file), filename(nullptr) { }
 	virtual ~SDFile(void) {
 		if (sdfatfile) sdfatfile.close();
 		if (filename) free(filename);
@@ -62,9 +74,9 @@ public:
 	}
 	virtual const char * name() {
 		if (!filename) {
-			filename = (char *)malloc(256);
+			filename = (char *)malloc(MAX_FILENAME_LEN);
 			if (filename) {
-				sdfatfile.getName(filename, 256);
+				sdfatfile.getName(filename, MAX_FILENAME_LEN);
 			} else {
 				static char zeroterm = 0;
 				filename = &zeroterm;
@@ -76,7 +88,7 @@ public:
 		return sdfatfile.isDirectory();
 	}
 	virtual File openNextFile(uint8_t mode=0) {
-		FsFile file = sdfatfile.openNextFile();
+		SDFAT_FILE file = sdfatfile.openNextFile();
 		if (file) return File(new SDFile(file));
 		return File();
 	}
@@ -85,7 +97,7 @@ public:
 	}
 	using Print::write;
 private:
-	FsFile sdfatfile;
+	SDFAT_FILE sdfatfile;
 	char *filename;
 };
 
@@ -107,7 +119,7 @@ public:
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
 		if (mode == FILE_WRITE) flags = O_READ | O_WRITE | O_CREAT;
-		FsFile file = sdfs.open(filepath, flags);
+		SDFAT_FILE file = sdfs.open(filepath, flags);
 		if (file) {
 			// Arduino's default FILE_WRITE starts at end of file
 			if (mode == FILE_WRITE) file.seekEnd(0);
@@ -128,11 +140,15 @@ public:
 		return sdfs.rmdir(filepath);
 	}
 public: // allow access, so users can mix SD & SdFat APIs
-	SdFs sdfs;
+	SDFAT_BASE sdfs;
 };
 
 extern SDClass SD;
 
+// do not expose these defines in Arduino sketches or other libraries
+#undef SDFAT_FILE
+#undef SDFAT_BASE
+#undef MAX_FILENAME_LEN
 
 
 #define SD_CARD_TYPE_SD1 0
