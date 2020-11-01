@@ -158,7 +158,7 @@ class Sd2Card
 {
 public:
 	bool init(uint8_t speed, uint8_t csPin) {
-		return SD.sdfs.begin(csPin);
+		return SD.begin(csPin);
 	}
 	uint8_t type() {
 		return SD.sdfs.card()->type();
