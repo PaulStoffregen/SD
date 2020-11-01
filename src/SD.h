@@ -114,7 +114,8 @@ public:
 			//return sdfs.begin(SdioConfig(DMA_SDIO));
 		}
 #endif
-		return sdfs.begin(csPin, SD_SCK_MHZ(24));
+		return sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(24)));
+		//return sdfs.begin(csPin, SD_SCK_MHZ(24));
 	}
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
