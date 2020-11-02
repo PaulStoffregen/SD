@@ -117,6 +117,12 @@ public:
 		return sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(24)));
 		//return sdfs.begin(csPin, SD_SCK_MHZ(24));
 	}
+	bool begin(SdSpiConfig spiConfig) {
+		return sdfs.begin(spiConfig);
+	}
+	bool begin(SdioConfig sdioConfig) {
+		return sdfs.begin(sdioConfig);
+	}
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
 		if (mode == FILE_WRITE) flags = O_READ | O_WRITE | O_CREAT;
