@@ -2,8 +2,15 @@
 #define __SD_H__
 
 #include <Arduino.h>
-#include <FS.h>
 #include <SdFat.h>
+// Use FILE_READ & FILE_WRITE as defined by FS.h
+#ifdef FILE_READ
+#undef FILE_READ
+#endif
+#ifdef FILE_WRITE
+#undef FILE_WRITE
+#endif
+#include <FS.h>
 
 #if defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 #define BUILTIN_SDCARD 254
@@ -119,13 +126,9 @@ public:
 	}
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
-		if (mode == FILE_WRITE) flags = O_READ | O_WRITE | O_CREAT;
+		if (mode == FILE_WRITE) flags = O_RDWR | O_CREAT | O_AT_END;
 		SDFAT_FILE file = sdfs.open(filepath, flags);
-		if (file) {
-			// Arduino's default FILE_WRITE starts at end of file
-			if (mode == FILE_WRITE) file.seekEnd(0);
-			return File(new SDFile(file));
-		}
+		if (file) return File(new SDFile(file));
 		return File();
 	}
 	bool exists(const char *filepath) {
