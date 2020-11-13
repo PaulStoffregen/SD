@@ -138,13 +138,20 @@ public:
 		return sdfs.mkdir(filepath);
 	}
 	bool rename(const char *oldfilepath, const char *newfilepath) {
-		return sdfs.remame(oldfilepath, newfilepath);
+		return sdfs.rename(oldfilepath, newfilepath);
 	}
 	bool remove(const char *filepath) {
 		return sdfs.remove(filepath);
 	}
 	bool rmdir(const char *filepath) {
 		return sdfs.rmdir(filepath);
+	}
+	uint64_t usedSize() {
+		return (uint64_t)(sdfs.clusterCount() - sdfs.freeClusterCount())
+		  * (uint64_t)sdfs.bytesPerCluster();
+	}
+	uint64_t totalSize() {
+		return (uint64_t)sdfs.clusterCount() * (uint64_t)sdfs.bytesPerCluster();
 	}
 public: // allow access, so users can mix SD & SdFat APIs
 	SDFAT_BASE sdfs;
