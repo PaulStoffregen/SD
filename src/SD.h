@@ -137,6 +137,9 @@ public:
 	bool mkdir(const char *filepath) {
 		return sdfs.mkdir(filepath);
 	}
+	bool rename(const char *oldfilepath, const char *newfilepath) {
+		return sdfs.remame(oldfilepath, newfilepath);
+	}
 	bool remove(const char *filepath) {
 		return sdfs.remove(filepath);
 	}
