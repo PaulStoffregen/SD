@@ -79,16 +79,16 @@ public:
 	virtual size_t read(void *buf, size_t nbyte) {
 		return sdfatfile.read(buf, nbyte);
 	}
-	virtual bool seek(uint32_t pos, int mode = SeekSet) {
+	virtual bool seek(uint64_t pos, int mode = SeekSet) {
 		if (mode == SeekSet) return sdfatfile.seekSet(pos);
 		if (mode == SeekCur) return sdfatfile.seekCur(pos);
 		if (mode == SeekEnd) return sdfatfile.seekEnd(pos);
 		return false;
 	}
-	virtual uint32_t position() {
+	virtual uint64_t position() {
 		return sdfatfile.curPosition();
 	}
-	virtual uint32_t size() {
+	virtual uint64_t size() {
 		return sdfatfile.size();
 	}
 	virtual void close() {
