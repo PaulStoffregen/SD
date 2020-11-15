@@ -1,5 +1,5 @@
 /*
-  SD card basic file example
+  SD card basic directory list example
  
  This example shows how to create and destroy an SD card file 	
  The circuit:
@@ -18,24 +18,18 @@
  	 
  */
 #include <SD.h>
-#include <SPI.h>
-
-File root;
 
 // change this to match your SD shield or module;
-// Arduino Ethernet shield: pin 4
-// Adafruit SD shields and modules: pin 10
-// Sparkfun SD shield: pin 8
-// Teensy audio board: pin 10
-// Teensy 3.5 & 3.6 & 4.1 on-board: BUILTIN_SDCARD
-// Wiz820+SD board: pin 4
 // Teensy 2.0: pin 0
 // Teensy++ 2.0: pin 20
-const int chipSelect = 4;
+// Wiz820+SD board: pin 4
+// Teensy audio board: pin 10
+// Teensy 3.5 & 3.6 & 4.1 on-board: BUILTIN_SDCARD
+const int chipSelect = 10;
 
 void setup()
 {
-  //UNCOMMENT THESE TWO LINES FOR TEENSY AUDIO BOARD:
+  //Uncomment these lines for Teensy 3.x Audio Shield (Rev C)
   //SPI.setMOSI(7);  // Audio shield has MOSI on pin 7
   //SPI.setSCK(14);  // Audio shield has SCK on pin 14  
   
@@ -45,7 +39,6 @@ void setup()
     ; // wait for serial port to connect.
   }
 
-
   Serial.print("Initializing SD card...");
 
   if (!SD.begin(chipSelect)) {
@@ -54,7 +47,7 @@ void setup()
   }
   Serial.println("initialization done.");
 
-  root = SD.open("/");
+  File root = SD.open("/");
   
   printDirectory(root, 0);
   
@@ -66,30 +59,31 @@ void loop()
   // nothing happens after setup finishes.
 }
 
-void printDirectory(File dir, int numTabs) {
+void printDirectory(File dir, int numSpaces) {
    while(true) {
-     
-     File entry =  dir.openNextFile();
+     File entry = dir.openNextFile();
      if (! entry) {
-       // no more files
-       //Serial.println("**nomorefiles**");
+       //Serial.println("** no more files **");
        break;
      }
-     for (uint8_t i=0; i<numTabs; i++) {
-       Serial.print('\t');
-     }
+     printSpaces(numSpaces);
      Serial.print(entry.name());
      if (entry.isDirectory()) {
        Serial.println("/");
-       printDirectory(entry, numTabs+1);
+       printDirectory(entry, numSpaces+2);
      } else {
        // files have sizes, directories do not
-       Serial.print("\t\t");
+       printSpaces(48 - numSpaces - strlen(entry.name()));
+       Serial.print("  ");
        Serial.println(entry.size(), DEC);
      }
      entry.close();
    }
 }
 
-
+void printSpaces(int num) {
+  for (int i=0; i < num; i++) {
+    Serial.print(" ");
+  }
+}
 
