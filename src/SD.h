@@ -153,6 +153,11 @@ public:
 		if (file) return File(new SDFile(file));
 		return File();
 	}
+	File open(const char *filepath, oflag_t flags = O_READ) {
+		SDFAT_FILE file = sdfs.open(filepath, flags);
+		if (file) return File(new SDFile(file));
+		return File();
+	}
 	bool exists(const char *filepath) {
 		return sdfs.exists(filepath);
 	}
