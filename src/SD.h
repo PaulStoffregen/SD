@@ -79,6 +79,9 @@ public:
 	virtual size_t read(void *buf, size_t nbyte) {
 		return sdfatfile.read(buf, nbyte);
 	}
+	virtual bool truncate(uint64_t size=0) {
+		return sdfatfile.truncate(size);
+	}
 	virtual bool seek(uint64_t pos, int mode = SeekSet) {
 		if (mode == SeekSet) return sdfatfile.seekSet(pos);
 		if (mode == SeekCur) return sdfatfile.seekCur(pos);
