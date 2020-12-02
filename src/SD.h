@@ -26,10 +26,10 @@
 #include <Arduino.h>
 #include <SdFat.h>
 // Use FILE_READ & FILE_WRITE as defined by FS.h
-#ifdef FILE_READ
+#if defined(FILE_READ) && !defined(FS_H)
 #undef FILE_READ
 #endif
-#ifdef FILE_WRITE
+#if defined(FILE_WRITE) && !defined(FS_H)
 #undef FILE_WRITE
 #endif
 #include <FS.h>
