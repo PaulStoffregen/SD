@@ -204,7 +204,7 @@ extern SDClass SD;
 class Sd2Card
 {
 public:
-	bool init(uint8_t speed, uint8_t csPin) {
+	bool init(uint32_t speed, uint8_t csPin) {
 		return SD.begin(csPin);
 	}
 	uint8_t type() {
