@@ -188,6 +188,7 @@ public:
 	}
 public: // allow access, so users can mix SD & SdFat APIs
 	SDFAT_BASE sdfs;
+	operator SDFAT_BASE & () { return sdfs; }
 };
 
 extern SDClass SD;
