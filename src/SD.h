@@ -50,7 +50,7 @@
   #define MAX_FILENAME_LEN 64
 #endif
 
-class SDFile : public File
+class SDFile : public FileImpl
 {
 private:
 	// Classes derived from File are never meant to be constructed
@@ -62,15 +62,8 @@ private:
 	friend class SDClass;
 public:
 	virtual ~SDFile(void) {
-		if (sdfatfile) sdfatfile.close();
-		if (filename) free(filename);
+		close();
 	}
-#ifdef FILE_WHOAMI
-	virtual void whoami() {
-		Serial.printf("   SDFile this=%x, refcount=%u\n",
-			(int)this, getRefcount());
-	}
-#endif
 	virtual size_t write(const void *buf, size_t size) {
 		return sdfatfile.write(buf, size);
 	}
@@ -106,9 +99,11 @@ public:
 			free(filename);
 			filename = nullptr;
 		}
-		sdfatfile.close();
+		if (sdfatfile.isOpen()) {
+			sdfatfile.close();
+		}
 	}
-	virtual operator bool() {
+	virtual bool isOpen() {
 		return sdfatfile.isOpen();
 	}
 	virtual const char * name() {
@@ -134,7 +129,6 @@ public:
 	virtual void rewindDirectory(void) {
 		sdfatfile.rewindDirectory();
 	}
-	using Print::write;
 private:
 	SDFAT_FILE sdfatfile;
 	char *filename;
