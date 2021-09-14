@@ -32,7 +32,7 @@ File myFile;
 // Wiz820+SD board: pin 4
 // Teensy 2.0: pin 0
 // Teensy++ 2.0: pin 20
-const int chipSelect = 4;
+const int chipSelect = 10;
 
 void setup()
 {
