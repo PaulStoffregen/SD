@@ -129,6 +129,38 @@ public:
 	virtual void rewindDirectory(void) {
 		sdfatfile.rewindDirectory();
 	}
+	virtual bool getCreateTime(DateTimeFields &tm) {
+		uint16_t fat_date, fat_time;
+		if (!sdfatfile.getCreateDateTime(&fat_date, &fat_time)) return false;
+		tm.sec = FS_SECOND(fat_time);
+		tm.min = FS_MINUTE(fat_time);
+		tm.hour = FS_HOUR(fat_time);
+		tm.mday = FS_DAY(fat_date);
+		tm.mon = FS_MONTH(fat_date) - 1;
+		tm.year = FS_YEAR(fat_date) - 1900;
+		return true;
+	}
+	virtual bool getModifyTime(DateTimeFields &tm) {
+		uint16_t fat_date, fat_time;
+		if (!sdfatfile.getModifyDateTime(&fat_date, &fat_time)) return false;
+		tm.sec = FS_SECOND(fat_time);
+		tm.min = FS_MINUTE(fat_time);
+		tm.hour = FS_HOUR(fat_time);
+		tm.mday = FS_DAY(fat_date);
+		tm.mon = FS_MONTH(fat_date) - 1;
+		tm.year = FS_YEAR(fat_date) - 1900;
+		return true;
+	}
+	virtual bool setCreateTime(const DateTimeFields &tm) {
+		if (tm.year < 80 || tm.year > 207) return false;
+		return sdfatfile.timestamp(T_CREATE, tm.year + 1900, tm.mon + 1,
+			tm.mday, tm.hour, tm.min, tm.sec);
+	}
+	virtual bool setModifyTime(const DateTimeFields &tm) {
+		if (tm.year < 80 || tm.year > 207) return false;
+		return sdfatfile.timestamp(T_WRITE, tm.year + 1900, tm.mon + 1,
+			tm.mday, tm.hour, tm.min, tm.sec);
+	}
 private:
 	SDFAT_FILE sdfatfile;
 	char *filename;
