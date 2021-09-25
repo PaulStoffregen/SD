@@ -141,6 +141,9 @@ class SDClass : public FS
 public:
 	SDClass() { }
 	bool begin(uint8_t csPin = 10) {
+#ifdef __arm__
+		FsDateTime::setCallback(dateTime);
+#endif
 #ifdef BUILTIN_SDCARD
 		if (csPin == BUILTIN_SDCARD) {
 			return sdfs.begin(SdioConfig(FIFO_SDIO));
@@ -183,6 +186,7 @@ public:
 public: // allow access, so users can mix SD & SdFat APIs
 	SDFAT_BASE sdfs;
 	operator SDFAT_BASE & () { return sdfs; }
+	static void dateTime(uint16_t *date, uint16_t *time);
 };
 
 extern SDClass SD;

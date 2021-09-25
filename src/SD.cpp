@@ -24,3 +24,19 @@
 #include <SD.h>
 
 SDClass SD;
+
+#ifdef __arm__
+void SDClass::dateTime(uint16_t *date, uint16_t *time)
+{
+	uint32_t now = Teensy3Clock.get();
+	if (now < 315532800) { // before 1980
+		*date = 0;
+		*time = 0;
+	} else {
+		DateTimeFields datetime;
+		breakTime(now, datetime);
+		*date = FS_DATE(datetime.year + 1900, datetime.mon + 1, datetime.mday);
+		*time = FS_TIME(datetime.hour, datetime.min, datetime.sec);
+	}
+}
+#endif
