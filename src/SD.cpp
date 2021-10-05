@@ -40,3 +40,28 @@ void SDClass::dateTime(uint16_t *date, uint16_t *time)
 	}
 }
 #endif
+
+bool SDClass::format(int type, char progressChar, Print& pr)
+{
+	SdCard *card = SD.sdfs.card();
+	if (!card) return false; // no SD card
+	uint32_t sectors = card->sectorCount();
+	if (sectors <= 12288) return false; // card too small
+	uint8_t *buf = (uint8_t *)malloc(512);
+	if (!buf) return false; // unable to allocate memory
+	bool ret;
+	if (sectors > 67108864) {
+#ifdef __arm__
+		ExFatFormatter exFatFormatter;
+		ret = exFatFormatter.format(card, buf, &pr);
+#else
+		ret = false;
+#endif
+	} else {
+		FatFormatter fatFormatter;
+		ret = fatFormatter.format(card, buf, &pr);
+	}
+	free(buf);
+	return ret;
+}
+

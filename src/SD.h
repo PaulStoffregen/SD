@@ -215,6 +215,7 @@ public:
 	uint64_t totalSize() {
 		return (uint64_t)sdfs.clusterCount() * (uint64_t)sdfs.bytesPerCluster();
 	}
+	bool format(int type=0, char progressChar=0, Print& pr=Serial);
 public: // allow access, so users can mix SD & SdFat APIs
 	SDFAT_BASE sdfs;
 	operator SDFAT_BASE & () { return sdfs; }
