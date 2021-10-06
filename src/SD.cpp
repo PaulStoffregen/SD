@@ -43,7 +43,7 @@ void SDClass::dateTime(uint16_t *date, uint16_t *time)
 
 bool SDClass::format(int type, char progressChar, Print& pr)
 {
-	SdCard *card = SD.sdfs.card();
+	SdCard *card = sdfs.card();
 	if (!card) return false; // no SD card
 	uint32_t sectors = card->sectorCount();
 	if (sectors <= 12288) return false; // card too small
