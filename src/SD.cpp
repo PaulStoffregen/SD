@@ -65,3 +65,43 @@ bool SDClass::format(int type, char progressChar, Print& pr)
 	return ret;
 }
 
+bool SDClass::mediaPresent()
+{
+	if (cspin == 255) return false; // begin() not called yet
+	//Serial.print("mediaPresent: ");
+	bool ret;
+	SdCard *card = sdfs.card();
+	if (card) {
+		if (cardPreviouslyPresent) {
+			uint32_t s = card->status();
+			if (s == 0xFFFFFFFF) {
+				// SPI doesn't have 32 bit status, read CID register
+				cid_t cid;
+				ret = card->readCID(&cid);
+				//Serial.print(ret ? "CID=ok" : "CID=unreadable");
+			} else if (s == 0) {
+				// assume zero status means card removed
+				// bits 12:9 are card state, which should
+				// normally be 101 = data transfer mode
+				//Serial.print("status=offline");
+				ret = false;
+			} else {
+				//Serial.print("status=present");
+				ret = true;
+			}
+		} else {
+			// TODO: need a quick test, only call begin if likely present
+			ret = begin(cspin);
+			//Serial.print(ret ? "begin ok" : "begin nope");
+		}
+	} else {
+		//Serial.print("no card");
+		ret = false;
+	}
+	//Serial.println();
+	cardPreviouslyPresent = ret;
+	return ret;
+}
+
+
+

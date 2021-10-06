@@ -173,17 +173,20 @@ class SDClass : public FS
 public:
 	SDClass() { }
 	bool begin(uint8_t csPin = 10) {
+		cspin = csPin;
 #ifdef __arm__
 		FsDateTime::setCallback(dateTime);
 #endif
 #ifdef BUILTIN_SDCARD
 		if (csPin == BUILTIN_SDCARD) {
-			return sdfs.begin(SdioConfig(FIFO_SDIO));
-			//return sdfs.begin(SdioConfig(DMA_SDIO));
+			bool ret = sdfs.begin(SdioConfig(FIFO_SDIO));
+			cardPreviouslyPresent = ret;
+			return ret;
 		}
 #endif
-		return sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(16)));
-		//return sdfs.begin(csPin, SD_SCK_MHZ(24));
+		bool ret = sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(16)));
+		cardPreviouslyPresent = ret;
+		return ret;
 	}
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
@@ -216,10 +219,14 @@ public:
 		return (uint64_t)sdfs.clusterCount() * (uint64_t)sdfs.bytesPerCluster();
 	}
 	bool format(int type=0, char progressChar=0, Print& pr=Serial);
+	bool mediaPresent();
 public: // allow access, so users can mix SD & SdFat APIs
 	SDFAT_BASE sdfs;
 	operator SDFAT_BASE & () { return sdfs; }
 	static void dateTime(uint16_t *date, uint16_t *time);
+private:
+	bool cardPreviouslyPresent = false;
+	uint8_t cspin = 255;
 };
 
 extern SDClass SD;
