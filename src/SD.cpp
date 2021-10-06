@@ -62,6 +62,10 @@ bool SDClass::format(int type, char progressChar, Print& pr)
 		ret = fatFormatter.format(card, buf, &pr);
 	}
 	free(buf);
+	if (ret) {
+		// TODO: Is begin() really necessary?  Is a quicker way possible?
+		begin(cspin);
+	}
 	return ret;
 }
 
