@@ -64,14 +64,13 @@ bool SDClass::format(int type, char progressChar, Print& pr)
 	free(buf);
 	if (ret) {
 		// TODO: Is begin() really necessary?  Is a quicker way possible?
-		begin(cspin);
+		sdfs.restart(); // TODO: is sdfs.volumeBegin() enough??
 	}
 	return ret;
 }
 
 bool SDClass::mediaPresent()
 {
-	if (cspin == 255) return false; // begin() not called yet
 	//Serial.print("mediaPresent: ");
 	bool ret;
 	SdCard *card = sdfs.card();
@@ -95,7 +94,7 @@ bool SDClass::mediaPresent()
 			}
 		} else {
 			// TODO: need a quick test, only call begin if likely present
-			ret = begin(cspin);
+			ret = sdfs.restart();
 			//Serial.print(ret ? "begin ok" : "begin nope");
 		}
 	} else {
