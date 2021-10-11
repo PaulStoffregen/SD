@@ -184,9 +184,11 @@ public:
 			return ret;
 		}
 #endif
-		bool ret = sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(16)));
-		cardPreviouslyPresent = ret;
-		return ret;
+		if(csPin < 254) {
+			bool ret = sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(25)));
+			cardPreviouslyPresent = ret;
+			return ret;
+		}
 	}
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
