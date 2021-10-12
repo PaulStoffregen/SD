@@ -25,6 +25,9 @@
 
 #include <Arduino.h>
 #include <SdFat.h>
+#if !defined(SD_FAT_TEENSY_MODIFIED)
+#error "Teensy's SD library uses a custom modified copy of SdFat.  Standard SdFat was mistakenly used.  Arduino should print multiple libraries found for SdFat.h.  To resolve this error, you will need to move or delete the copy Arduino is using, or otherwise take steps to cause Teensy's special copy of SdFat to be used."
+#endif
 // Use FILE_READ & FILE_WRITE as defined by FS.h
 #if defined(FILE_READ) && !defined(FS_H)
 #undef FILE_READ
