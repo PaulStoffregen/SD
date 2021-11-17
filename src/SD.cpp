@@ -76,7 +76,11 @@ bool SDClass::mediaPresent()
 	SdCard *card = sdfs.card();
 	if (card) {
 		if (cardPreviouslyPresent) {
+			#ifdef BUILTIN_SDCARD
 			uint32_t s = card->status();
+			#else
+			const uint32_t s = 0xFFFFFFFF;
+			#endif
 			if (s == 0xFFFFFFFF) {
 				// SPI doesn't have 32 bit status, read CID register
 				cid_t cid;
