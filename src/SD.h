@@ -175,24 +175,7 @@ class SDClass : public FS
 {
 public:
 	SDClass() { }
-	bool begin(uint8_t csPin = 10) {
-#ifdef __arm__
-		FsDateTime::setCallback(dateTime);
-#endif
-#ifdef BUILTIN_SDCARD
-		if (csPin == BUILTIN_SDCARD) {
-			bool ret = sdfs.begin(SdioConfig(FIFO_SDIO));
-			cardPreviouslyPresent = ret;
-			return ret;
-		}
-#endif
-		if (csPin < NUM_DIGITAL_PINS) {
-			bool ret = sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(25)));
-			cardPreviouslyPresent = ret;
-			return ret;
-		}
-		return false;
-	}
+	bool begin(uint8_t csPin = 10);
 	File open(const char *filepath, uint8_t mode = FILE_READ) {
 		oflag_t flags = O_READ;
 		if (mode == FILE_WRITE) flags = O_RDWR | O_CREAT | O_AT_END;
@@ -231,6 +214,7 @@ public: // allow access, so users can mix SD & SdFat APIs
 	static void dateTime(uint16_t *date, uint16_t *time);
 private:
 	bool cardPreviouslyPresent = false;
+	uint8_t csPin_ = 0xff;  	
 };
 
 extern SDClass SD;
