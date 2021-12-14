@@ -77,6 +77,9 @@ bool SDClass::mediaPresent()
 	if (card) {
 		if (cardPreviouslyPresent) {
 			#ifdef BUILTIN_SDCARD
+			#if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+			card->syncDevice();
+			#endif  // defined(__MK64FX512__) || defined(__MK66FX1M0__)
 			uint32_t s = card->status();
 			#else
 			const uint32_t s = 0xFFFFFFFF;
