@@ -25,6 +25,16 @@
 
 SDClass SD;
 
+#if defined(ARDUINO_TEENSY41)
+static const uint8_t _SD_DAT3=46;
+#elif defined(ARDUINO_TEENSY40)
+static const uint8_t _SD_DAT3=38;
+#elif defined(ARDUINO_TEENSY_MICROMOD)
+static const uint8_t _SD_DAT3=39;
+#elif defined(ARDUINO_TEENSY35) || defined(ARDUINO_TEENSY36)
+static const uint8_t _SD_DAT3=62;
+#endif
+
 #ifdef __arm__
 void SDClass::dateTime(uint16_t *date, uint16_t *time)
 {
@@ -69,6 +79,30 @@ bool SDClass::format(int type, char progressChar, Print& pr)
 	return ret;
 }
 
+bool SDClass::begin(uint8_t csPin) {
+#ifdef __arm__
+	FsDateTime::setCallback(dateTime);
+#endif
+#ifdef BUILTIN_SDCARD
+	csPin_ = csPin; // remember which one passed in. 
+	if (csPin == BUILTIN_SDCARD) {
+		bool ret = sdfs.begin(SdioConfig(FIFO_SDIO));
+		cardPreviouslyPresent = ret;
+		#if defined(__IMXRT1062__)
+		// start off with just trying on T4.x
+		if (!ret) pinMode(_SD_DAT3, INPUT_PULLDOWN);
+		#endif
+		return ret;
+	}
+#endif
+	if (csPin < NUM_DIGITAL_PINS) {
+		bool ret = sdfs.begin(SdSpiConfig(csPin, SHARED_SPI, SD_SCK_MHZ(25)));
+		cardPreviouslyPresent = ret;
+		return ret;
+	}
+	return false;
+}
+
 bool SDClass::mediaPresent()
 {
 	//Serial.print("mediaPresent: ");
@@ -77,7 +111,13 @@ bool SDClass::mediaPresent()
 	if (card) {
 		if (cardPreviouslyPresent) {
 			#ifdef BUILTIN_SDCARD
-			uint32_t s = card->status();
+			uint32_t s;
+			if (csPin_ == BUILTIN_SDCARD) {
+				#if defined(__MK64FX512__) || defined(__MK66FX1M0__)
+				card->syncDevice();
+				#endif  // defined(__MK64FX512__) || defined(__MK66FX1M0__)
+				s = card->status();
+			} else s = 0xFFFFFFFF;
 			#else
 			const uint32_t s = 0xFFFFFFFF;
 			#endif
@@ -92,13 +132,24 @@ bool SDClass::mediaPresent()
 				// normally be 101 = data transfer mode
 				//Serial.print("status=offline");
 				ret = false;
+				#ifdef __IMXRT1062__
+				if (csPin_ == BUILTIN_SDCARD) 
+					pinMode(_SD_DAT3, INPUT_PULLDOWN);
+				#endif
 			} else {
 				//Serial.print("status=present");
 				ret = true;
 			}
 		} else {
 			// TODO: need a quick test, only call begin if likely present
-			ret = sdfs.restart();
+			#ifdef __IMXRT1062__
+			if ((csPin_ == BUILTIN_SDCARD) && !digitalReadFast(_SD_DAT3))
+				ret = false;
+			else
+			#endif
+			{
+				ret = sdfs.restart();
+			}
 			//Serial.print(ret ? "begin ok" : "begin nope");
 		}
 	} else {
