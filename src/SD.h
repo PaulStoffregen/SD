@@ -210,13 +210,22 @@ public:
 	}
 	bool format(int type=0, char progressChar=0, Print& pr=Serial);
 	bool mediaPresent();
+
+	// call to allow you to specify if your SD reader has an IO pin that
+	// can be used to detect if an chip is inserted.  On BUILTIN_SDCARD
+	// we will default to use it if you use the begin method, howver
+	// if you bypass this and call directly to SDFat begin, then you
+	// can use this to let us know. 
+	bool setMediaDetectPin(uint8_t pin);
+
 public: // allow access, so users can mix SD & SdFat APIs
 	SDFAT_BASE sdfs;
 	operator SDFAT_BASE & () { return sdfs; }
 	static void dateTime(uint16_t *date, uint16_t *time);
 private:
 	bool cardPreviouslyPresent = false;
-	uint8_t csPin_ = 0xff;  	
+	uint8_t csPin_ = 0xff;
+	uint8_t cdPin_ = 0xff;
 };
 
 extern SDClass SD;
