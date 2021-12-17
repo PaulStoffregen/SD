@@ -24,6 +24,7 @@ position	KEYWORD2
 size	KEYWORD2
 format	KEYWORD2
 mediaPresent	KEYWORD2
+setMediaDetectPin	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
