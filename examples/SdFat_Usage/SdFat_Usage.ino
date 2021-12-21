@@ -17,6 +17,11 @@
 */
 #include <SD.h>
 
+// On Teensy 2.0, SdFat's files are "File32" rather than "FsFat"
+#ifdef __AVR__
+#define FsFile File32
+#endif
+
 void setup()
 {
   //Uncomment these lines for Teensy 3.x Audio Shield (Rev C)
@@ -109,7 +114,7 @@ void setup()
     Serial.print("  unable to preallocate this file");
   }
   myfile.print("Just some test data written to the file (by SdFat functions)");
-  myfile.write(0);
+  myfile.write('\0'); // add a null byte to mark end of string
   myfile.close();
 
   // You can also use regular SD functions, even to access the same file.  Just
