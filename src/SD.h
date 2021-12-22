@@ -135,6 +135,7 @@ public:
 	virtual bool getCreateTime(DateTimeFields &tm) {
 		uint16_t fat_date, fat_time;
 		if (!sdfatfile.getCreateDateTime(&fat_date, &fat_time)) return false;
+		if ((fat_date == 0) && (fat_time == 0)) return false;
 		tm.sec = FS_SECOND(fat_time);
 		tm.min = FS_MINUTE(fat_time);
 		tm.hour = FS_HOUR(fat_time);
@@ -146,6 +147,7 @@ public:
 	virtual bool getModifyTime(DateTimeFields &tm) {
 		uint16_t fat_date, fat_time;
 		if (!sdfatfile.getModifyDateTime(&fat_date, &fat_time)) return false;
+		if ((fat_date == 0) && (fat_time == 0)) return false;
 		tm.sec = FS_SECOND(fat_time);
 		tm.min = FS_MINUTE(fat_time);
 		tm.hour = FS_HOUR(fat_time);
