@@ -26,13 +26,13 @@
 SDClass SD;
 
 #if defined(ARDUINO_TEENSY41)
-static const uint8_t _SD_DAT3=46;
+#define _SD_DAT3 46
 #elif defined(ARDUINO_TEENSY40)
-static const uint8_t _SD_DAT3=38;
+#define _SD_DAT3 38
 #elif defined(ARDUINO_TEENSY_MICROMOD)
-static const uint8_t _SD_DAT3=39;
+#define _SD_DAT3 39
 #elif defined(ARDUINO_TEENSY35) || defined(ARDUINO_TEENSY36)
-static const uint8_t _SD_DAT3=62;
+// #define _SD_DAT3 62  // currently not doing on 3.5/6...
 #endif
 
 #ifdef __arm__
@@ -83,13 +83,14 @@ bool SDClass::begin(uint8_t csPin) {
 #ifdef __arm__
 	FsDateTime::setCallback(dateTime);
 #endif
-#ifdef BUILTIN_SDCARD
 	csPin_ = csPin; // remember which one passed in. 
+#ifdef BUILTIN_SDCARD
 	if (csPin == BUILTIN_SDCARD) {
 		bool ret = sdfs.begin(SdioConfig(FIFO_SDIO));
 		cardPreviouslyPresent = ret;
 		#if defined(__IMXRT1062__)
 		// start off with just trying on T4.x
+		cdPin_ = _SD_DAT3;
 		if (!ret) pinMode(_SD_DAT3, INPUT_PULLDOWN);
 		#endif
 		return ret;
@@ -108,6 +109,7 @@ bool SDClass::mediaPresent()
 	//Serial.print("mediaPresent: ");
 	bool ret;
 	SdCard *card = sdfs.card();
+//	Serial.printf("mediaPresent: card:%x cs:%u cd:%u\n", (uint32_t)card, csPin_, cdPin_);
 	if (card) {
 		if (cardPreviouslyPresent) {
 			#ifdef BUILTIN_SDCARD
@@ -122,9 +124,13 @@ bool SDClass::mediaPresent()
 			const uint32_t s = 0xFFFFFFFF;
 			#endif
 			if (s == 0xFFFFFFFF) {
-				// SPI doesn't have 32 bit status, read CID register
-				cid_t cid;
-				ret = card->readCID(&cid);
+				// see if we have digital pin to bypass...
+				if (cdPin_ < NUM_DIGITAL_PINS) ret = digitalRead(cdPin_);
+				else {
+					// SPI doesn't have 32 bit status, read CID register
+					cid_t cid;
+					ret = card->readCID(&cid);
+				}
 				//Serial.print(ret ? "CID=ok" : "CID=unreadable");
 			} else if (s == 0) {
 				// assume zero status means card removed
@@ -132,7 +138,7 @@ bool SDClass::mediaPresent()
 				// normally be 101 = data transfer mode
 				//Serial.print("status=offline");
 				ret = false;
-				#ifdef __IMXRT1062__
+				#ifdef _SD_DAT3
 				if (csPin_ == BUILTIN_SDCARD) 
 					pinMode(_SD_DAT3, INPUT_PULLDOWN);
 				#endif
@@ -142,13 +148,20 @@ bool SDClass::mediaPresent()
 			}
 		} else {
 			// TODO: need a quick test, only call begin if likely present
-			#ifdef __IMXRT1062__
-			if ((csPin_ == BUILTIN_SDCARD) && !digitalReadFast(_SD_DAT3))
-				ret = false;
+			ret = true; // assume we need to check
+
+			#ifdef _SD_DAT3
+			if (csPin_ == BUILTIN_SDCARD) ret = digitalReadFast(_SD_DAT3);
 			else
 			#endif
 			{
+				if (cdPin_ < NUM_DIGITAL_PINS) ret = digitalRead(cdPin_);
+			}
+			// now try to restart
+			if (ret)
+			{
 				ret = sdfs.restart();
+				// bugbug:: if it fails and builtin may need to start pinMode again...
 			}
 			//Serial.print(ret ? "begin ok" : "begin nope");
 		}
@@ -161,5 +174,26 @@ bool SDClass::mediaPresent()
 	return ret;
 }
 
-
-
+bool SDClass::setMediaDetectPin(uint8_t pin)
+{
+	Serial.printf("SDClass::setMediaDetectPin(%u)", pin);
+	#if defined(BUILTIN_SDCARD)	
+	if (pin == BUILTIN_SDCARD) {
+		csPin_ = BUILTIN_SDCARD;  // force it in case user did begin using sdCard
+		#if defined(_SD_DAT3)
+		cdPin_ = _SD_DAT3;
+		if (!cardPreviouslyPresent) pinMode(_SD_DAT3, INPUT_PULLDOWN);
+		#else
+		cdPin_ = 0xff;
+		#endif
+	}
+	#endif
+	if (pin < NUM_DIGITAL_PINS) {
+		cdPin_ = pin;
+		pinMode(cdPin_, INPUT_PULLUP);
+	} else {
+		cdPin_ = 0xff;
+		return false;
+	}
+	return true;
+}
