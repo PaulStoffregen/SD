@@ -73,7 +73,8 @@ void printDirectory(File dir, int numSpaces) {
        printDirectory(entry, numSpaces+2);
      } else {
        // files have sizes, directories do not
-       unsigned int n = log10(entry.size());
+       int n = log10f(entry.size());
+       if (n < 0) n = 10;
        if (n > 10) n = 10;
        printSpaces(50 - numSpaces - strlen(entry.name()) - n);
        Serial.print("  ");
