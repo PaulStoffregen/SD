@@ -67,7 +67,7 @@ void setup()
   Serial.println("initialization done.");
   Serial.println();
 
-  // After the SD card is initialized, you can access is using the ordinary
+  // After the SD card is initialized, you can access it using the ordinary
   // SD library functions, regardless of whether it was initialized by
   // SD library SD.begin() or SdFat library SD.sdfs.begin().
   //
