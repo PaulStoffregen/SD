@@ -51,7 +51,7 @@ void setup()
   // interrupts, but for many cases speed is much faster.
   //ok = SD.sdfs.begin(SdSpiConfig(chipSelect, DEDICATED_SPI, SD_SCK_MHZ(16)));
 
-  // Different SPI port (Teensy 4.1 SPI1 is MOSI:pin26, MISO:pin27, SCL:pin1)
+  // Different SPI port (Teensy 4.1 SPI1 is MOSI1:pin26, MISO1:pin1, SCK1:pin27)
   //ok = SD.sdfs.begin(SdSpiConfig(chipSelect, SHARED_SPI, SD_SCK_MHZ(16), &SPI1));
 
   // Access the built in SD card on Teensy 3.5, 3.6, 4.1 using FIFO
