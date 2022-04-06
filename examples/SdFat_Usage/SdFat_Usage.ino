@@ -52,7 +52,8 @@ void setup()
   //ok = SD.sdfs.begin(SdSpiConfig(chipSelect, DEDICATED_SPI, SD_SCK_MHZ(16)));
 
   // Different SPI port (Teensy 4.1 SPI1 is MOSI1:pin26, MISO1:pin1, SCK1:pin27)
-  // photo: https://forum.pjrc.com/threads/69254?p=297875&viewfull=1#post297875
+  // SPI1 photo: https://forum.pjrc.com/threads/69254?p=297875&viewfull=1#post297875
+  // SPI2 photo: https://forum.pjrc.com/threads/60954?p=303782&viewfull=1#post303782
   //ok = SD.sdfs.begin(SdSpiConfig(chipSelect, SHARED_SPI, SD_SCK_MHZ(16), &SPI1));
 
   // Access the built in SD card on Teensy 3.5, 3.6, 4.1 using FIFO
