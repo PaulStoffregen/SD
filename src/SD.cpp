@@ -74,6 +74,7 @@ bool SDClass::format(int type, char progressChar, Print& pr)
 	free(buf);
 	if (ret) {
 		// TODO: Is begin() really necessary?  Is a quicker way possible?
+		card->syncDevice();
 		sdfs.restart(); // TODO: is sdfs.volumeBegin() enough??
 	}
 	return ret;
