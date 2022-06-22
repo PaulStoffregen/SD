@@ -202,10 +202,12 @@ public:
 		return sdfs.rmdir(filepath);
 	}
 	uint64_t usedSize() {
+		if (!cardPreviouslyPresent) return (uint64_t)0;
 		return (uint64_t)(sdfs.clusterCount() - sdfs.freeClusterCount())
 		  * (uint64_t)sdfs.bytesPerCluster();
 	}
 	uint64_t totalSize() {
+		if (!cardPreviouslyPresent) return (uint64_t)0;
 		return (uint64_t)sdfs.clusterCount() * (uint64_t)sdfs.bytesPerCluster();
 	}
 	bool format(int type=0, char progressChar=0, Print& pr=Serial);
