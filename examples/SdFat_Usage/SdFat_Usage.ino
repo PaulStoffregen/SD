@@ -119,7 +119,7 @@ void setup()
     Serial.print("  unable to preallocate this file");
   }
   myfile.print("Just some test data written to the file (by SdFat functions)");
-  myfile.write('\0'); // add a null byte to mark end of string
+  myfile.write((uint8_t)'\0'); // add a null byte to mark end of string
   myfile.close();
 
   // You can also use regular SD functions, even to access the same file.  Just
