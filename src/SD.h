@@ -41,16 +41,16 @@
 #define BUILTIN_SDCARD 254
 #endif
 
-#if defined(__arm__)
-  // Support everything on 32 bit boards with enough memory
-  #define SDFAT_FILE FsFile
-  #define SDFAT_BASE SdFs
-  #define MAX_FILENAME_LEN 256
-#elif defined(__AVR__)
+#if defined(__AVR__) || defined(SDFAT_LOWMEM)
   // Limit to 32GB cards on 8 bit Teensy with only limited memory
   #define SDFAT_FILE File32
   #define SDFAT_BASE SdFat32
   #define MAX_FILENAME_LEN 64
+#elif defined(__arm__)
+  // Support everything on 32 bit boards with enough memory
+  #define SDFAT_FILE FsFile
+  #define SDFAT_BASE SdFs
+  #define MAX_FILENAME_LEN 256
 #endif
 
 class SDFile : public FileImpl
@@ -217,7 +217,7 @@ public:
 	// can be used to detect if an chip is inserted.  On BUILTIN_SDCARD
 	// we will default to use it if you use the begin method, howver
 	// if you bypass this and call directly to SDFat begin, then you
-	// can use this to let us know. 
+	// can use this to let us know.
 	bool setMediaDetectPin(uint8_t pin);
 
 public: // allow access, so users can mix SD & SdFat APIs
