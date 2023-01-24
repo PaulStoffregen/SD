@@ -266,6 +266,9 @@ public:
 	uint32_t clusterCount() {
 		return SD.sdfs.vol()->clusterCount();
 	}
+	operator FsVolume * () __attribute__ ((deprecated("Use SD.begin() to access SD cards"))) {
+		return SD.sdfs.vol();
+	}
 };
 
 #endif
