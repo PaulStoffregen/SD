@@ -33,7 +33,7 @@ void setup()
 
   Serial.print("Initializing SD card...");
   bool ok;
-  const int chipSelect = 10;
+  const int chipSelect = 10; // only for SPI, can't use BUILTIN_SDCARD here
 
   // Instead of the usual SD.begin(pin), you can access the underlying
   // SdFat library for much more control over how the SD card is
