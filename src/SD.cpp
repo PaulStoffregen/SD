@@ -25,7 +25,9 @@
 
 SDClass SD;
 
-#if defined(ARDUINO_TEENSY41)
+#if defined(ARDUINO_QUARTO)
+#define _SD_DAT3 14
+#elif defined(ARDUINO_TEENSY41)
 #define _SD_DAT3 46
 #elif defined(ARDUINO_TEENSY40)
 #define _SD_DAT3 38
