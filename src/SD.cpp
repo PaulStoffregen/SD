@@ -51,7 +51,7 @@ void SDClass::dateTime(uint16_t *date, uint16_t *time)
 }
 #endif
 
-bool SDClass::format(int type, char progressChar, Print& pr)
+bool SDClass::format(int type __attribute__((unused)), char progressChar __attribute__((unused)), Print &pr)
 {
 	SdCard *card = sdfs.card();
 	if (!card) return false; // no SD card

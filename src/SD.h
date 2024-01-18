@@ -124,7 +124,7 @@ public:
 	virtual boolean isDirectory(void) {
 		return sdfatfile.isDirectory();
 	}
-	virtual File openNextFile(uint8_t mode=0) {
+	virtual File openNextFile(uint8_t mode __attribute__((unused))=0) {
 		SDFAT_FILE file = sdfatfile.openNextFile();
 		if (file) return File(new SDFile(file));
 		return File();
@@ -244,7 +244,7 @@ extern SDClass SD;
 class Sd2Card
 {
 public:
-	bool init(uint32_t speed, uint8_t csPin) {
+	bool init(uint32_t speed __attribute__((unused)), uint8_t csPin) {
 		return SD.begin(csPin);
 	}
 	uint8_t type() {
@@ -254,10 +254,11 @@ public:
 class SdVolume
 {
 public:
-	bool init(Sd2Card &card) {
-		return SD.sdfs.vol() != nullptr;
-	}
-	uint8_t fatType() {
+    bool init(Sd2Card &card __attribute__((unused)))
+    {
+        return SD.sdfs.vol() != nullptr;
+    }
+    uint8_t fatType() {
 		return SD.sdfs.vol()->fatType();
 	}
 	uint32_t blocksPerCluster() {
