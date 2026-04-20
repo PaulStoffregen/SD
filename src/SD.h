@@ -106,6 +106,9 @@ public:
 			sdfatfile.close();
 		}
 	}
+	virtual int fgets(char* str, int num, char* delim = nullptr) {
+		return sdfatfile.fgets(str, num, delim);
+	}
 	virtual bool isOpen() {
 		return sdfatfile.isOpen();
 	}
