@@ -113,7 +113,7 @@ void setup()
     // reduce the file to zero if it already had data
     myfile.truncate();
   }
-  if (myfile.preAllocate(40*1024*1024)) {
+  if (myfile.preAllocate(40UL*1024*1024)) {
     Serial.print("  Allocate 40 megabytes for datalog.bin");
   } else {
     Serial.print("  unable to preallocate this file");
@@ -164,4 +164,3 @@ void printSpaces(int num) {
     Serial.print(" ");
   }
 }
-
